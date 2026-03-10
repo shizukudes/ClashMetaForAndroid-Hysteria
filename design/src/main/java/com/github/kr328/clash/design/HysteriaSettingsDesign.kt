@@ -42,28 +42,28 @@ class HysteriaSettingsDesign(
 
             editableText(
                 value = store::serverIp,
-                adapter = NullableTextAdapter.String,
+                adapter = TextAdapter.String,
                 icon = R.drawable.ic_baseline_domain,
                 title = R.string.hysteria_server_ip,
             )
 
             editableText(
                 value = store::serverPortRange,
-                adapter = NullableTextAdapter.String,
+                adapter = TextAdapter.String,
                 icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_server_port_range,
             )
 
             editableText(
                 value = store::password,
-                adapter = NullableTextAdapter.String,
+                adapter = TextAdapter.String,
                 icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_password,
             )
 
             editableText(
                 value = store::obfs,
-                adapter = NullableTextAdapter.String,
+                adapter = TextAdapter.String,
                 icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_obfs,
             )
@@ -100,7 +100,7 @@ class HysteriaSettingsDesign(
 
             editableText(
                 value = store::logLevel,
-                adapter = NullableTextAdapter.String,
+                adapter = TextAdapter.String,
                 icon = R.drawable.ic_baseline_assignment,
                 title = R.string.hysteria_log_level,
             )
