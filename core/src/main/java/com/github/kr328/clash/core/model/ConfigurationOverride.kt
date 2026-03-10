@@ -5,6 +5,7 @@ import android.os.Parcelable
 import com.github.kr328.clash.core.util.Parcelizer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class ConfigurationOverride(
@@ -81,10 +82,10 @@ data class ConfigurationOverride(
     val geoxurl: GeoXUrl = GeoXUrl(),
 
     @SerialName("proxies")
-    var proxies: List<Map<String, String>>? = null,
+    var proxies: List<Map<String, JsonElement>>? = null,
 
     @SerialName("proxy-groups")
-    var proxyGroups: List<Map<String, Any>>? = null,
+    var proxyGroups: List<Map<String, JsonElement>>? = null,
 ) : Parcelable {
     @Serializable
     data class Dns(

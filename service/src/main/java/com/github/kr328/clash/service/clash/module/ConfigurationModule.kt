@@ -13,6 +13,7 @@ import com.github.kr328.clash.service.util.importedDir
 import com.github.kr328.clash.service.util.sendProfileLoaded
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.selects.select
+import kotlinx.serialization.json.JsonPrimitive
 import java.util.*
 
 class ConfigurationModule(service: Service) : Module<ConfigurationModule.LoadException>(service) {
@@ -61,10 +62,10 @@ class ConfigurationModule(service: Service) : Module<ConfigurationModule.LoadExc
 
                 if (hStore.enabled) {
                     val hysteriaProxy = mapOf(
-                        "name" to "Hysteria-LB",
-                        "type" to "socks5",
-                        "server" to "127.0.0.1",
-                        "port" to hStore.localPort.toString(),
+                        "name" to JsonPrimitive("Hysteria-LB"),
+                        "type" to JsonPrimitive("socks5"),
+                        "server" to JsonPrimitive("127.0.0.1"),
+                        "port" to JsonPrimitive(hStore.localPort),
                     )
 
                     override.proxies = listOf(hysteriaProxy)
