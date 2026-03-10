@@ -144,25 +144,11 @@ subprojects {
         }
 
         signingConfigs {
-            val keystore = rootProject.file("signing.properties")
-            if (keystore.exists()) {
-                create("release") {
-                    val prop = Properties().apply {
-                        keystore.inputStream().use(this::load)
-                    }
-
-                    storeFile = rootProject.file("release.keystore")
-                    storePassword = prop.getProperty("keystore.password")!!
-                    keyAlias = prop.getProperty("key.alias")!!
-                    keyPassword = prop.getProperty("key.password")!!
-                }
-            } else {
-                create("release") {
-                    storeFile = rootProject.file("release.keystore")
-                    storePassword = "123456"
-                    keyAlias = "key0"
-                    keyPassword = "123456"
-                }
+            create("release") {
+                storeFile = rootProject.file("release.keystore")
+                storePassword = "123456"
+                keyAlias = "key0"
+                keyPassword = "123456"
             }
         }
 
