@@ -17,6 +17,7 @@ jobs:
 
       - name: Generate Keystore
         run: |
+          rm -f release.keystore
           keytool -genkey -v -keystore release.keystore -alias key0 -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=ClashMeta, OU=Clash, O=Clash, L=ID, S=ID, C=ID"
 
       - name: Setup Java
