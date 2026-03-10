@@ -76,7 +76,7 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
             profileDir.resolve("config.yaml").writeText(yaml)
 
             // 2. Add to DB if not exists
-            val dao = ImportedDao()
+            val dao = com.github.kr328.clash.service.data.Database.database.openImportedDao()
             if (dao.queryByUUID(uuid) == null) {
                 dao.insert(
                     Imported(
