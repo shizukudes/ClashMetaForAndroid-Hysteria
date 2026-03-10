@@ -89,7 +89,9 @@ class ConfigurationModule(service: Service) : Module<ConfigurationModule.LoadExc
                 Clash.load(service.importedDir.resolve(active.uuid.toString())).await()
 
                 val remove = SelectionDao().querySelections(active.uuid)
-                    .filterNot { Clash.patchSelector(it.proxy, it.selected) }
+                    .filterNot { 
+                        (hStore.enabled && it.proxy == "Proxy") || Clash.patchSelector(it.proxy, it.selected) 
+                    }
                     .map { it.proxy }
 
                 SelectionDao().removeSelections(active.uuid, remove)
