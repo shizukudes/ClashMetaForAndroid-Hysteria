@@ -69,7 +69,16 @@ class ConfigurationModule(service: Service) : Module<ConfigurationModule.LoadExc
                     )
 
                     override.proxies = listOf(hysteriaProxy)
-                    override.proxyGroups = emptyList() // Clear groups override to let profile's groups work
+                    
+                    val hysteriaGroup = mapOf(
+                        "name" to JsonPrimitive("Proxy"),
+                        "type" to JsonPrimitive("select"),
+                        "proxies" to kotlinx.serialization.json.buildJsonArray {
+                            add(JsonPrimitive("Hysteria-LB"))
+                            add(JsonPrimitive("DIRECT"))
+                        }
+                    )
+                    override.proxyGroups = listOf(hysteriaGroup)
                 } else {
                     override.proxies = null
                     override.proxyGroups = null

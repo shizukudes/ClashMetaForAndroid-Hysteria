@@ -61,14 +61,14 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                     port: $port
                 
                 proxy-groups:
-                  - name: "Hysteria-Select"
+                  - name: "Proxy"
                     type: select
                     proxies:
                       - "Hysteria-LB"
                       - DIRECT
                 
                 rules:
-                  - MATCH,Hysteria-Select
+                  - MATCH,Proxy
             """.trimIndent()
 
             // 1. Write file
