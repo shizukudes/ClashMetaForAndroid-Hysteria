@@ -73,7 +73,7 @@ class ConfigurationModule(service: Service) : Module<ConfigurationModule.LoadExc
                     // Logic to inject Hysteria-LB into proxy groups is handled by Meta core if we provide proxy-groups override.
                     // To be sure it appears in UI, we should add a group that contains it.
                     val hysteriaGroup = mapOf(
-                        "name" to JsonPrimitive("Hysteria-Group"),
+                        "name" to JsonPrimitive("Proxy"),
                         "type" to JsonPrimitive("select"),
                         "proxies" to kotlinx.serialization.json.buildJsonArray {
                             add(JsonPrimitive("Hysteria-LB"))
