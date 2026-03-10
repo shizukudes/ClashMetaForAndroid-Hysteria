@@ -35,73 +35,73 @@ class HysteriaSettingsDesign(
             category(R.string.hysteria_settings)
 
             switch(
-                value = store::enabled,
-                icon = R.drawable.ic_baseline_vpn_lock,
+                value = Value(store::enabled),
+                icon = R.drawable.ic_baseline_dns,
                 title = R.string.hysteria_enabled,
             )
 
             editableText(
-                value = store::serverIp,
+                value = Value(store::serverIp),
                 adapter = NullableTextAdapter.String,
                 icon = R.drawable.ic_baseline_domain,
                 title = R.string.hysteria_server_ip,
             )
 
             editableText(
-                value = store::serverPortRange,
+                value = Value(store::serverPortRange),
                 adapter = NullableTextAdapter.String,
-                icon = R.drawable.ic_baseline_numbers,
+                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_server_port_range,
             )
 
             editableText(
-                value = store::password,
+                value = Value(store::password),
                 adapter = NullableTextAdapter.String,
-                icon = R.drawable.ic_baseline_lock,
+                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_password,
             )
 
             editableText(
-                value = store::obfs,
+                value = Value(store::obfs),
                 adapter = NullableTextAdapter.String,
-                icon = R.drawable.ic_baseline_security,
+                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_obfs,
             )
 
             editableText(
-                value = store::localPort,
+                value = Value(store::localPort),
                 adapter = NullableTextAdapter.Int,
-                icon = R.drawable.ic_baseline_numbers,
+                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_local_port,
             )
 
-            category(R.string.advanced)
+            category(R.string.clash)
 
             editableText(
-                value = store::recvWindowConn,
+                value = Value(store::recvWindowConn),
                 adapter = NullableTextAdapter.Int,
-                icon = R.drawable.ic_baseline_open_in_new,
+                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_recv_window_conn,
             )
 
             editableText(
-                value = store::recvWindow,
+                value = Value(store::recvWindow),
                 adapter = NullableTextAdapter.Int,
-                icon = R.drawable.ic_baseline_window,
+                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_recv_window,
             )
 
             editableText(
-                value = store::coreCount,
+                value = Value(store::coreCount),
                 adapter = NullableTextAdapter.Int,
-                icon = R.drawable.ic_baseline_memory,
+                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_core_count,
             )
 
             editableText(
-                value = store::logLevel,
+                value = Value(store::logLevel),
                 adapter = NullableTextAdapter.String,
-                icon = R.drawable.ic_baseline_history,
+                icon = R.drawable.ic_baseline_assignment,
                 title = R.string.hysteria_log_level,
             )
 
@@ -109,7 +109,7 @@ class HysteriaSettingsDesign(
 
             clickable(
                 title = R.string.generate_config,
-                icon = R.drawable.ic_baseline_auto_fix_high,
+                icon = R.drawable.ic_baseline_add,
             ) {
                 clicked {
                     requests.trySend(Request.GenerateConfig)
