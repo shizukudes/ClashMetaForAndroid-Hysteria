@@ -71,7 +71,9 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
             """.trimIndent()
 
             // 1. Write file
-            importedDir.resolve(uuid.toString()).writeText(yaml)
+            val profileDir = importedDir.resolve(uuid.toString())
+            profileDir.mkdirs() // Create directory if it doesn't exist
+            profileDir.resolve("config.yaml").writeText(yaml)
 
             // 2. Add to DB if not exists
             val dao = ImportedDao()
