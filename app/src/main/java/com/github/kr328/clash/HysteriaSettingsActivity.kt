@@ -97,9 +97,9 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
             srvStore.activeProfile = uuid
             
             // 4. Notify change
-            sendBroadcast(Intents.ACTION_PROFILE_CHANGED) {
-                putExtra(Intents.EXTRA_UUID, uuid.toString())
-            }
+            val intent = android.content.Intent(Intents.ACTION_PROFILE_CHANGED)
+            intent.putExtra(Intents.EXTRA_UUID, uuid.toString())
+            this@HysteriaSettingsActivity.sendBroadcast(intent)
         }
     }
 }
