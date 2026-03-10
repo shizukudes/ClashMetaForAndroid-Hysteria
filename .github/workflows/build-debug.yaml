@@ -17,6 +17,14 @@ jobs:
       - name: Checkout submodules
         run: git submodule update --init --recursive --force
 
+      - name: Verify Binaries
+        run: |
+          ls -R service/src/main/jniLibs
+          test -f service/src/main/jniLibs/arm64-v8a/libuz.so
+          test -f service/src/main/jniLibs/arm64-v8a/libload.so
+          test -f service/src/main/jniLibs/armeabi-v7a/libuz.so
+          test -f service/src/main/jniLibs/armeabi-v7a/libload.so
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:

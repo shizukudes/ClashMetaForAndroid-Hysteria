@@ -35,71 +35,71 @@ class HysteriaSettingsDesign(
             category(R.string.hysteria_settings)
 
             switch(
-                value = Value(store::enabled),
+                value = store::enabled,
                 icon = R.drawable.ic_baseline_dns,
                 title = R.string.hysteria_enabled,
             )
 
             editableText(
-                value = Value(store::serverIp),
+                value = store::serverIp,
                 adapter = NullableTextAdapter.String,
                 icon = R.drawable.ic_baseline_domain,
                 title = R.string.hysteria_server_ip,
             )
 
             editableText(
-                value = Value(store::serverPortRange),
+                value = store::serverPortRange,
                 adapter = NullableTextAdapter.String,
                 icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_server_port_range,
             )
 
             editableText(
-                value = Value(store::password),
+                value = store::password,
                 adapter = NullableTextAdapter.String,
                 icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_password,
             )
 
             editableText(
-                value = Value(store::obfs),
+                value = store::obfs,
                 adapter = NullableTextAdapter.String,
                 icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_obfs,
             )
 
             editableText(
-                value = Value(store::localPort),
+                value = store::localPort,
                 adapter = NullableTextAdapter.Int,
                 icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_local_port,
             )
 
-            category(R.string.clash)
+            category(R.string.settings)
 
             editableText(
-                value = Value(store::recvWindowConn),
+                value = store::recvWindowConn,
                 adapter = NullableTextAdapter.Int,
                 icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_recv_window_conn,
             )
 
             editableText(
-                value = Value(store::recvWindow),
+                value = store::recvWindow,
                 adapter = NullableTextAdapter.Int,
                 icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_recv_window,
             )
 
             editableText(
-                value = Value(store::coreCount),
+                value = store::coreCount,
                 adapter = NullableTextAdapter.Int,
                 icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_core_count,
             )
 
             editableText(
-                value = Value(store::logLevel),
+                value = store::logLevel,
                 adapter = NullableTextAdapter.String,
                 icon = R.drawable.ic_baseline_assignment,
                 title = R.string.hysteria_log_level,
