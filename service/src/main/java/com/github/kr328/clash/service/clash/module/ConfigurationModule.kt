@@ -69,18 +69,7 @@ class ConfigurationModule(service: Service) : Module<ConfigurationModule.LoadExc
                     )
 
                     override.proxies = listOf(hysteriaProxy)
-                    
-                    // Logic to inject Hysteria-LB into proxy groups is handled by Meta core if we provide proxy-groups override.
-                    // To be sure it appears in UI, we should add a group that contains it.
-                    val hysteriaGroup = mapOf(
-                        "name" to JsonPrimitive("Proxy"),
-                        "type" to JsonPrimitive("select"),
-                        "proxies" to kotlinx.serialization.json.buildJsonArray {
-                            add(JsonPrimitive("Hysteria-LB"))
-                            add(JsonPrimitive("DIRECT"))
-                        }
-                    )
-                    override.proxyGroups = listOf(hysteriaGroup)
+                    override.proxyGroups = emptyList() // Clear groups override to let profile's groups work
                 } else {
                     override.proxies = null
                     override.proxyGroups = null

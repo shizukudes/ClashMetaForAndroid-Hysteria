@@ -41,7 +41,7 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
         withContext(Dispatchers.IO) {
             val uuid = UUID.nameUUIDFromBytes("hysteria-auto".toByteArray())
             val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
-            val name = "Hysteria-Auto ($dateStr)"
+            val name = "Hysteria Edition ($dateStr)"
             val port = hStore.localPort
             
             val yaml = """
@@ -61,14 +61,14 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                     port: $port
                 
                 proxy-groups:
-                  - name: "Proxy"
+                  - name: "Hysteria-Select"
                     type: select
                     proxies:
                       - "Hysteria-LB"
                       - DIRECT
                 
                 rules:
-                  - MATCH,Proxy
+                  - MATCH,Hysteria-Select
             """.trimIndent()
 
             // 1. Write file
