@@ -79,6 +79,12 @@ data class ConfigurationOverride(
 
     @SerialName("geox-url")
     val geoxurl: GeoXUrl = GeoXUrl(),
+
+    @SerialName("proxies")
+    var proxies: List<Map<String, String>>? = null,
+
+    @SerialName("proxy-groups")
+    var proxyGroups: List<Map<String, Any>>? = null,
 ) : Parcelable {
     @Serializable
     data class Dns(

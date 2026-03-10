@@ -175,6 +175,11 @@
             android:exported="false"
             android:label="@string/help" />
         <activity
+            android:name=".HysteriaSettingsActivity"
+            android:configChanges="uiMode"
+            android:exported="false"
+            android:label="@string/hysteria_settings" />
+        <activity
             android:name=".FilesActivity"
             android:configChanges="uiMode"
             android:exported="false"

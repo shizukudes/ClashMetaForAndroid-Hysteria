@@ -357,4 +357,17 @@
     <string name="shortcut_start_long">Start Clash service</string>
     <string name="shortcut_stop_short">Stop Clash</string>
     <string name="shortcut_stop_long">Stop Clash service</string>
+    <string name="hysteria_settings">Hysteria Settings</string>
+    <string name="hysteria_enabled">Enable Hysteria</string>
+    <string name="hysteria_server_ip">Server IP/Domain</string>
+    <string name="hysteria_server_port_range">Port Range (e.g. 10000-20000)</string>
+    <string name="hysteria_password">Password</string>
+    <string name="hysteria_obfs">Obfuscation</string>
+    <string name="hysteria_local_port">Local SOCKS Port</string>
+    <string name="hysteria_recv_window_conn">Recv Window Conn</string>
+    <string name="hysteria_recv_window">Recv Window</string>
+    <string name="hysteria_core_count">Core Count</string>
+    <string name="hysteria_log_level">Log Level</string>
+    <string name="action">Action</string>
+    <string name="generate_config">Generate &amp; Activate Profile</string>
 </resources>

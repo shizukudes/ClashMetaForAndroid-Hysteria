@@ -33,6 +33,7 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
         val tun = install(TunModule(self))
         val config = install(ConfigurationModule(self))
         val network = install(NetworkObserveModule(self))
+        install(HysteriaModule(self))
 
         if (store.dynamicNotification)
             install(DynamicNotificationModule(self))

@@ -28,6 +28,16 @@ interface NullableTextAdapter<T> {
                 return text
             }
         }
+
+        val Int = object : NullableTextAdapter<Int> {
+            override fun from(value: Int): String {
+                return value.toString()
+            }
+
+            override fun to(text: String?): Int {
+                return text?.toIntOrNull() ?: 0
+            }
+        }
     }
 }
 
