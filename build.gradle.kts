@@ -156,6 +156,13 @@ subprojects {
                     keyAlias = prop.getProperty("key.alias")!!
                     keyPassword = prop.getProperty("key.password")!!
                 }
+            } else {
+                create("release") {
+                    storeFile = rootProject.file("release.keystore")
+                    storePassword = "123456"
+                    keyAlias = "key0"
+                    keyPassword = "123456"
+                }
             }
         }
 

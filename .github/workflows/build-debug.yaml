@@ -25,6 +25,10 @@ jobs:
           test -f service/src/main/jniLibs/armeabi-v7a/libuz.so
           test -f service/src/main/jniLibs/armeabi-v7a/libload.so
 
+      - name: Generate Keystore
+        run: |
+          keytool -genkey -v -keystore release.keystore -alias key0 -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=ClashMeta, OU=Clash, O=Clash, L=ID, S=ID, C=ID"
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
