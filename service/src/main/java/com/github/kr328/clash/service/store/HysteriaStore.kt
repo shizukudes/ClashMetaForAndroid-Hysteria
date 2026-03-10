@@ -34,7 +34,7 @@ class HysteriaStore(context: Context) {
 
     var obfs: String by store.string(
         key = "hysteria_obfs",
-        defaultValue = "hu''hqb'c"
+        defaultValue = "hu``hqb`c"
     )
 
     var localPort: Int by store.int(

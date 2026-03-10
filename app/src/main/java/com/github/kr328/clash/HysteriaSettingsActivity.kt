@@ -40,7 +40,8 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
     private suspend fun generateAndActivateProfile(hStore: HysteriaStore) {
         withContext(Dispatchers.IO) {
             val uuid = UUID.nameUUIDFromBytes("hysteria-auto".toByteArray())
-            val name = "Hysteria-Auto"
+            val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+            val name = "Hysteria-Auto ($dateStr)"
             val port = hStore.localPort
             
             val yaml = """
@@ -80,7 +81,15 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
 
             // 2. Add to DB if not exists
             val dao = com.github.kr328.clash.service.data.Database.database.openImportedDao()
-            if (dao.queryByUUID(uuid) == null) {
+            val existing = dao.queryByUUID(uuid)
+            if (existing != null) {
+                dao.update(
+                    existing.copy(
+                        name = name,
+                        createdAt = System.currentTimeMillis()
+                    )
+                )
+            } else {
                 dao.insert(
                     Imported(
                         uuid = uuid,
@@ -105,6 +114,10 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
             val intent = android.content.Intent(Intents.ACTION_PROFILE_CHANGED)
             intent.putExtra(Intents.EXTRA_UUID, uuid.toString())
             this@HysteriaSettingsActivity.sendBroadcast(intent)
+            
+            withContext(Dispatchers.Main) {
+                finish()
+            }
         }
     }
 }
