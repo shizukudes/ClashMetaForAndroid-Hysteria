@@ -10,17 +10,16 @@ import com.github.kr328.clash.design.util.layoutInflater
 import com.github.kr328.clash.design.util.root
 import com.github.kr328.clash.service.model.HysteriaConfig
 import com.github.kr328.clash.service.model.HysteriaAccount
-import java.util.UUID
 
 class HysteriaSettingsDesign(
     context: Context,
     val config: HysteriaConfig,
 ) : Design<HysteriaSettingsDesign.Request>(context) {
-    enum class Request {
-        SaveAndGenerate,
-        AddAccount,
-        EditAccount(val account: HysteriaAccount),
-        DeleteAccount(val account: HysteriaAccount)
+    sealed class Request {
+        object SaveAndGenerate : Request()
+        object AddAccount : Request()
+        data class EditAccount(val account: HysteriaAccount) : Request()
+        data class DeleteAccount(val account: HysteriaAccount) : Request()
     }
 
     private val binding = DesignSettingsCommonBinding
@@ -50,7 +49,7 @@ class HysteriaSettingsDesign(
                 summary = R.string.hysteria_enabled_summary,
             )
 
-            category(R.string.settings) // Using settings as proxy for "Accounts"
+            category(R.string.settings)
 
             config.accounts.forEach { account ->
                 clickable(
@@ -73,26 +72,26 @@ class HysteriaSettingsDesign(
                 }
             }
 
-            category(R.string.clash) // Advanced settings
+            category(R.string.clash)
 
             editableText(
                 value = config::localPort,
                 adapter = NullableTextAdapter.Int,
-                icon = R.drawable.ic_baseline_numbers,
+                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_local_port,
             )
 
             editableText(
                 value = config::recvWindowConn,
                 adapter = NullableTextAdapter.Int,
-                icon = R.drawable.ic_baseline_speed,
+                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_recv_window_conn,
             )
 
             editableText(
                 value = config::recvWindow,
                 adapter = NullableTextAdapter.Int,
-                icon = R.drawable.ic_baseline_speed,
+                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_recv_window,
             )
 
@@ -108,7 +107,7 @@ class HysteriaSettingsDesign(
             clickable(
                 title = R.string.generate_config,
                 summary = R.string.generate_config_summary,
-                icon = R.drawable.ic_baseline_auto_fix_high,
+                icon = R.drawable.ic_baseline_add,
             ) {
                 clicked {
                     requests.trySend(Request.SaveAndGenerate)
