@@ -223,13 +223,13 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
             } else {
                 if (yaml.contains("proxies: []")) {
                     yaml = yaml.replace("proxies: []", "proxies:\n$proxyEntry")
-                } else if (yaml.contains("proxies:")) {
-                    yaml = yaml.replace("proxies:", "proxies:\n$proxyEntry")
+                } else {
+                    yaml = yaml.replaceFirst("proxies:", "proxies:\n$proxyEntry")
                 }
             }
 
             if (yaml.contains("name: \"Proxy\"") && !yaml.contains("- \"Hysteria-LB\"")) {
-                yaml = yaml.replace("proxies:", "proxies:\n      - \"Hysteria-LB\"")
+                yaml = yaml.replace(Regex("""(name: "Proxy"[\s\S]*?proxies:\s*)"""), "$1      - \"Hysteria-LB\"\n")
             }
 
             profileDir.resolve("config.yaml").writeText(yaml)
