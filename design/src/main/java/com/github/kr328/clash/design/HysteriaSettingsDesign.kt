@@ -53,8 +53,8 @@ class HysteriaSettingsDesign(
 
             config.accounts.forEach { account ->
                 clickable(
-                    title = TextAdapter.String.from(account.name),
-                    summary = TextAdapter.String.from("${account.serverIp}:${account.serverPortRange}"),
+                    titleString = account.name,
+                    summaryString = "${account.serverIp}:${account.serverPortRange}",
                     icon = R.drawable.ic_baseline_edit
                 ) {
                     clicked {
@@ -64,7 +64,7 @@ class HysteriaSettingsDesign(
             }
 
             clickable(
-                title = R.string.add,
+                title = R.string._new,
                 icon = R.drawable.ic_baseline_add
             ) {
                 clicked {
