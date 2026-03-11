@@ -177,10 +177,11 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
             profileDir.resolve("hysteria.json").writeText(json.encodeToString(HysteriaConfig.serializer(), config))
 
             // 2. Generate config.yaml
-            val name = when (config.accounts.size) {
-                0 -> "Hysteria (Empty)"
-                1 -> "Hysteria: ${config.accounts[0].name}"
-                else -> "Hysteria: ${config.accounts[0].name} (+${config.accounts.size - 1})"
+            val enabledAccounts = config.accounts.filter { it.enabled }
+            val name = when (enabledAccounts.size) {
+                0 -> "Hysteria (None Selected)"
+                1 -> "Hysteria: ${enabledAccounts[0].name}"
+                else -> "Hysteria: ${enabledAccounts[0].name} (+${enabledAccounts.size - 1})"
             }
 
             if (config.yamlTemplate.isBlank()) {

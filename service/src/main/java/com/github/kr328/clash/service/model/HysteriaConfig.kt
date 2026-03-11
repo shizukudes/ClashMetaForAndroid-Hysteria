@@ -10,6 +10,7 @@ data class HysteriaAccount(
     var serverPortRange: String,
     var password: String,
     var obfs: String,
+    var enabled: Boolean = true,
 )
 
 @Serializable

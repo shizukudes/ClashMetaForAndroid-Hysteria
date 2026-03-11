@@ -53,9 +53,10 @@ class HysteriaSettingsDesign(
             category(R.string.settings)
 
             config.accounts.forEach { account ->
-                clickable(
+                switch(
+                    value = account::enabled,
+                    icon = R.drawable.ic_baseline_dns,
                     title = R.string.edit,
-                    icon = R.drawable.ic_baseline_edit
                 ) {
                     title = account.name
                     summary = "${account.serverIp}:${account.serverPortRange}"
