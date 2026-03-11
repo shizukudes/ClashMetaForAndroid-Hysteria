@@ -64,7 +64,7 @@ class HysteriaSettingsDesign(
             }
 
             clickable(
-                title = TextAdapter.String.from("Add Account"),
+                title = R.string.add,
                 icon = R.drawable.ic_baseline_add
             ) {
                 clicked {
@@ -79,6 +79,7 @@ class HysteriaSettingsDesign(
                 adapter = NullableTextAdapter.Int,
                 icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_local_port,
+                summary = R.string.hysteria_local_port_summary,
             )
 
             editableText(
@@ -86,6 +87,7 @@ class HysteriaSettingsDesign(
                 adapter = NullableTextAdapter.Int,
                 icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_recv_window_conn,
+                summary = R.string.hysteria_recv_window_conn_summary,
             )
 
             editableText(
@@ -93,6 +95,7 @@ class HysteriaSettingsDesign(
                 adapter = NullableTextAdapter.Int,
                 icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_recv_window,
+                summary = R.string.hysteria_recv_window_summary,
             )
 
             editableText(
@@ -100,6 +103,7 @@ class HysteriaSettingsDesign(
                 adapter = TextAdapter.String,
                 icon = R.drawable.ic_baseline_assignment,
                 title = R.string.hysteria_log_level,
+                summary = R.string.hysteria_log_level_summary,
             )
 
             category(R.string.action)

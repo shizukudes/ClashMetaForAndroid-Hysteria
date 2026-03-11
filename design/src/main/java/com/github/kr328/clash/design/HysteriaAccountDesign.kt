@@ -14,8 +14,8 @@ class HysteriaAccountDesign(
     context: Context,
     val account: HysteriaAccount,
 ) : Design<HysteriaAccountDesign.Request>(context) {
-    enum class Request {
-        Delete
+    sealed class Request {
+        object Delete : Request()
     }
 
     private val binding = DesignSettingsCommonBinding
@@ -30,13 +30,13 @@ class HysteriaAccountDesign(
         binding.scrollRoot.bindAppBarElevation(binding.activityBarLayout)
 
         val screen = preferenceScreen(context) {
-            category(TextAdapter.String.from("Account Details"))
+            category(R.string.settings)
 
             editableText(
                 value = account::name,
                 adapter = TextAdapter.String,
                 icon = R.drawable.ic_baseline_edit,
-                title = TextAdapter.String.from("Name"),
+                title = R.string.edit,
             )
 
             editableText(
@@ -44,6 +44,7 @@ class HysteriaAccountDesign(
                 adapter = TextAdapter.String,
                 icon = R.drawable.ic_baseline_domain,
                 title = R.string.hysteria_server_ip,
+                summary = R.string.hysteria_server_ip_summary,
             )
 
             editableText(
@@ -51,26 +52,29 @@ class HysteriaAccountDesign(
                 adapter = TextAdapter.String,
                 icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_server_port_range,
+                summary = R.string.hysteria_server_port_range_summary,
             )
 
             editableText(
                 value = account::password,
                 adapter = TextAdapter.String,
-                icon = R.drawable.ic_baseline_lock,
+                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_password,
+                summary = R.string.hysteria_password_summary,
             )
 
             editableText(
                 value = account::obfs,
                 adapter = TextAdapter.String,
-                icon = R.drawable.ic_baseline_security,
+                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_obfs,
+                summary = R.string.hysteria_obfs_summary,
             )
 
             category(R.string.action)
 
             clickable(
-                title = TextAdapter.String.from("Delete Account"),
+                title = R.string.delete,
                 icon = R.drawable.ic_baseline_delete
             ) {
                 clicked {
