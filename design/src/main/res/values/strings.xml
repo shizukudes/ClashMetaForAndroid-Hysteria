@@ -381,4 +381,6 @@
     <string name="action">Action</string>
     <string name="generate_config">Generate &amp; Activate Profile</string>
     <string name="generate_config_summary">Create a Hysteria-optimized Clash profile</string>
+    <string name="edit_template">Edit YAML Template</string>
+    <string name="edit_template_summary">Custom Clash rules and settings for this profile</string>
 </resources>

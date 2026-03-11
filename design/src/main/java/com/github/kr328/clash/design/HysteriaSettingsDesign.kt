@@ -18,6 +18,7 @@ class HysteriaSettingsDesign(
     sealed class Request {
         object SaveAndGenerate : Request()
         object AddAccount : Request()
+        object EditTemplate : Request()
         data class EditAccount(val account: HysteriaAccount) : Request()
         data class DeleteAccount(val account: HysteriaAccount) : Request()
     }
@@ -103,6 +104,17 @@ class HysteriaSettingsDesign(
                 title = R.string.hysteria_log_level,
                 icon = R.drawable.ic_baseline_assignment,
             )
+
+            clickable(
+                title = R.string.edit_template,
+                icon = R.drawable.ic_baseline_edit,
+            ) {
+                summary = context.getString(R.string.edit_template_summary)
+                
+                clicked {
+                    requests.trySend(Request.EditTemplate)
+                }
+            }
 
             category(R.string.action)
 

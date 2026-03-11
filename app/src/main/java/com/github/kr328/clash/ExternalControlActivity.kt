@@ -31,6 +31,19 @@ class ExternalControlActivity : Activity(), CoroutineScope by MainScope() {
         when(intent.action) {
             Intent.ACTION_VIEW -> {
                 val uri = intent.data ?: return finish()
+                
+                if (uri.scheme == "hysteria" && uri.host == "auto") {
+                    launch {
+                        val uuid = withProfile {
+                            val name = "Hysteria Auto"
+                            create(Profile.Type.File, name)
+                        }
+                        startActivity(HysteriaSettingsActivity::class.intent.setUUID(uuid))
+                        finish()
+                    }
+                    return
+                }
+
                 val url = uri.getQueryParameter("url") ?: return finish()
 
                 launch {

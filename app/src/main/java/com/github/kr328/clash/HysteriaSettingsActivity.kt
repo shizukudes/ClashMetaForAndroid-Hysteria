@@ -3,6 +3,7 @@ package com.github.kr328.clash
 import com.github.kr328.clash.common.constants.Intents
 import com.github.kr328.clash.design.HysteriaSettingsDesign
 import com.github.kr328.clash.design.HysteriaAccountDesign
+import com.github.kr328.clash.design.HysteriaTemplateDesign
 import com.github.kr328.clash.service.data.Imported
 import com.github.kr328.clash.service.data.ImportedDao
 import com.github.kr328.clash.service.model.Profile
@@ -72,6 +73,9 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                                 design.update()
                             }
                         }
+                        HysteriaSettingsDesign.Request.EditTemplate -> {
+                            editTemplate(config)
+                        }
                         is HysteriaSettingsDesign.Request.DeleteAccount -> {
                             config.accounts = config.accounts.filter { it.id != request.account.id }
                             design.update()
@@ -106,18 +110,9 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
         return result
     }
 
-    private suspend fun saveAndGenerate(uuid: UUID, config: HysteriaConfig) {
-        withContext(Dispatchers.IO) {
-            // 1. Save hysteria.json
-            val profileDir = importedDir.resolve(uuid.toString())
-            profileDir.mkdirs()
-            profileDir.resolve("hysteria.json").writeText(json.encodeToString(HysteriaConfig.serializer(), config))
-
-            // 2. Generate config.yaml
-            val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
-            val name = "Hysteria Edition ($dateStr)"
-            
-            val yaml = """
+    private suspend fun editTemplate(config: HysteriaConfig) {
+        if (config.yamlTemplate.isBlank()) {
+            config.yamlTemplate = """
                 mode: rule
                 ipv6: false
                 log-level: info
@@ -139,22 +134,103 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                     - https://1.1.1.1/dns-query
                     - https://1.0.0.1/dns-query
                 
-                proxies:
-                  - name: "Hysteria-LB"
-                    type: socks5
-                    server: 127.0.0.1
-                    port: ${config.localPort}
+                proxies: []
                 
                 proxy-groups:
                   - name: "Proxy"
                     type: select
                     proxies:
-                      - "Hysteria-LB"
                       - DIRECT
                 
                 rules:
                   - MATCH,Proxy
             """.trimIndent()
+        }
+
+        val templateDesign = HysteriaTemplateDesign(this, config)
+
+        pushDesign(templateDesign)
+
+        try {
+            while (isActive) {
+                val request = select<HysteriaTemplateDesign.Request?> {
+                    events.onReceive { null }
+                    templateDesign.requests.onReceive { it }
+                }
+                if (request == null) break
+            }
+        } finally {
+            popDesign()
+        }
+    }
+
+    private suspend fun saveAndGenerate(uuid: UUID, config: HysteriaConfig) {
+        withContext(Dispatchers.IO) {
+            // 1. Save hysteria.json
+            val profileDir = importedDir.resolve(uuid.toString())
+            profileDir.mkdirs()
+            profileDir.resolve("hysteria.json").writeText(json.encodeToString(HysteriaConfig.serializer(), config))
+
+            // 2. Generate config.yaml
+            val name = when (config.accounts.size) {
+                0 -> "Hysteria (Empty)"
+                1 -> "Hysteria: ${config.accounts[0].name}"
+                else -> "Hysteria: ${config.accounts[0].name} (+${config.accounts.size - 1})"
+            }
+
+            if (config.yamlTemplate.isBlank()) {
+                config.yamlTemplate = """
+                    mode: rule
+                    ipv6: false
+                    log-level: info
+                    allow-lan: true
+                    mixed-port: 7890
+                    unified-delay: true
+                    tcp-concurrent: true
+                    external-controller: 127.0.0.1:9090
+                    
+                    dns:
+                      enable: true
+                      ipv6: false
+                      enhanced-mode: fake-ip
+                      fake-ip-range: 198.18.0.1/16
+                      default-nameserver:
+                        - 1.1.1.1
+                        - 8.8.8.8
+                      nameserver:
+                        - https://1.1.1.1/dns-query
+                        - https://1.0.0.1/dns-query
+                    
+                    proxies: []
+                    
+                    proxy-groups:
+                      - name: "Proxy"
+                        type: select
+                        proxies:
+                          - DIRECT
+                    
+                    rules:
+                      - MATCH,Proxy
+                """.trimIndent()
+            }
+            
+            var yaml = config.yamlTemplate
+            val proxyEntry = "  - name: \"Hysteria-LB\"\n    type: socks5\n    server: 127.0.0.1\n    port: ${config.localPort}"
+
+            if (yaml.contains("name: \"Hysteria-LB\"")) {
+                yaml = yaml.replace(Regex("name: \"Hysteria-LB\"\\s+type: socks5\\s+server: 127.0.0.1\\s+port: \\d+"), 
+                                   "name: \"Hysteria-LB\"\n    type: socks5\n    server: 127.0.0.1\n    port: ${config.localPort}")
+            } else {
+                if (yaml.contains("proxies: []")) {
+                    yaml = yaml.replace("proxies: []", "proxies:\n$proxyEntry")
+                } else if (yaml.contains("proxies:")) {
+                    yaml = yaml.replace("proxies:", "proxies:\n$proxyEntry")
+                }
+            }
+
+            if (yaml.contains("name: \"Proxy\"") && !yaml.contains("- \"Hysteria-LB\"")) {
+                yaml = yaml.replace("proxies:", "proxies:\n      - \"Hysteria-LB\"")
+            }
 
             profileDir.resolve("config.yaml").writeText(yaml)
 
