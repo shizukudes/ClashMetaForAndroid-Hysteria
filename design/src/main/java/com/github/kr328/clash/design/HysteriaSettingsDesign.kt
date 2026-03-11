@@ -64,7 +64,7 @@ class HysteriaSettingsDesign(
             }
 
             clickable(
-                title = R.string.edit,
+                title = R.string.add,
                 icon = R.drawable.ic_baseline_add
             ) {
                 clicked {
