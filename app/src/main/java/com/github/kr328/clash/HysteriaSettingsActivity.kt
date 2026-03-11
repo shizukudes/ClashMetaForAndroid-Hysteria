@@ -1,6 +1,7 @@
 package com.github.kr328.clash
 
 import com.github.kr328.clash.common.constants.Intents
+import com.github.kr328.clash.common.util.uuid
 import com.github.kr328.clash.design.HysteriaSettingsDesign
 import com.github.kr328.clash.design.HysteriaAccountDesign
 import com.github.kr328.clash.design.HysteriaTemplateDesign
@@ -24,7 +25,11 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
 
     override suspend fun main() {
         val sStore = ServiceStore(this)
-        val activeUuid = sStore.activeProfile ?: return finish()
+        val activeUuid = intent.uuid ?: sStore.activeProfile ?: return finish()
+
+        if (sStore.activeProfile != activeUuid) {
+            sStore.activeProfile = activeUuid
+        }
         val configFile = importedDir.resolve(activeUuid.toString()).resolve("hysteria.json")
         
         val config = if (configFile.exists()) {
