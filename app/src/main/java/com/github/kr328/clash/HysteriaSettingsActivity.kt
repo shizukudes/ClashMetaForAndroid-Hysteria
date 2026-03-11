@@ -134,12 +134,17 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                     - https://1.1.1.1/dns-query
                     - https://1.0.0.1/dns-query
                 
-                proxies: []
+                proxies:
+                  - name: "Hysteria-LB"
+                    type: socks5
+                    server: 127.0.0.1
+                    port: ${config.localPort}
                 
                 proxy-groups:
                   - name: "Proxy"
                     type: select
                     proxies:
+                      - "Hysteria-LB"
                       - DIRECT
                 
                 rules:
@@ -201,12 +206,17 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                         - https://1.1.1.1/dns-query
                         - https://1.0.0.1/dns-query
                     
-                    proxies: []
+                    proxies:
+                      - name: "Hysteria-LB"
+                        type: socks5
+                        server: 127.0.0.1
+                        port: ${config.localPort}
                     
                     proxy-groups:
                       - name: "Proxy"
                         type: select
                         proxies:
+                          - "Hysteria-LB"
                           - DIRECT
                     
                     rules:
@@ -215,21 +225,13 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
             }
             
             var yaml = config.yamlTemplate
-            val proxyEntry = "  - name: \"Hysteria-LB\"\n    type: socks5\n    server: 127.0.0.1\n    port: ${config.localPort}"
-
+            
             if (yaml.contains("name: \"Hysteria-LB\"")) {
-                yaml = yaml.replace(Regex("name: \"Hysteria-LB\"\\s+type: socks5\\s+server: 127.0.0.1\\s+port: \\d+"), 
-                                   "name: \"Hysteria-LB\"\n    type: socks5\n    server: 127.0.0.1\n    port: ${config.localPort}")
+                val regex = Regex("""(name:\s*["']Hysteria-LB["'][\s\S]*?port:\s*)\d+""")
+                yaml = yaml.replace(regex, "$1${config.localPort}")
             } else {
-                if (yaml.contains("proxies: []")) {
-                    yaml = yaml.replace("proxies: []", "proxies:\n$proxyEntry")
-                } else {
-                    yaml = yaml.replaceFirst("proxies:", "proxies:\n$proxyEntry")
-                }
-            }
-
-            if (yaml.contains("name: \"Proxy\"") && !yaml.contains("- \"Hysteria-LB\"")) {
-                yaml = yaml.replace(Regex("""(name: "Proxy"[\s\S]*?proxies:\s*)"""), "$1      - \"Hysteria-LB\"\n")
+                val proxyEntry = "  - name: \"Hysteria-LB\"\n    type: socks5\n    server: 127.0.0.1\n    port: ${config.localPort}"
+                yaml = yaml.replaceFirst("proxies:", "proxies:\n$proxyEntry")
             }
 
             profileDir.resolve("config.yaml").writeText(yaml)
