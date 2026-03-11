@@ -1,12 +1,10 @@
 package com.github.kr328.clash
 
 import com.github.kr328.clash.common.constants.Intents
+import com.github.kr328.clash.common.util.uuid
 import com.github.kr328.clash.design.HysteriaSettingsDesign
 import com.github.kr328.clash.design.HysteriaAccountDesign
 import com.github.kr328.clash.design.HysteriaTemplateDesign
-import com.github.kr328.clash.service.data.Imported
-import com.github.kr328.clash.service.data.ImportedDao
-import com.github.kr328.clash.service.model.Profile
 import com.github.kr328.clash.service.model.HysteriaConfig
 import com.github.kr328.clash.service.model.HysteriaAccount
 import com.github.kr328.clash.service.store.ServiceStore
@@ -27,7 +25,11 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
 
     override suspend fun main() {
         val sStore = ServiceStore(this)
-        val activeUuid = sStore.activeProfile ?: return finish()
+        val activeUuid = intent.uuid ?: sStore.activeProfile ?: return finish()
+
+        if (sStore.activeProfile != activeUuid) {
+            sStore.activeProfile = activeUuid
+        }
         val configFile = importedDir.resolve(activeUuid.toString()).resolve("hysteria.json")
         
         val config = if (configFile.exists()) {
@@ -71,6 +73,9 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                         is HysteriaSettingsDesign.Request.EditAccount -> {
                             if (editAccount(request.account)) {
                                 design.update()
+                            } else {
+                                config.accounts = config.accounts.filter { it.id != request.account.id }
+                                design.update()
                             }
                         }
                         HysteriaSettingsDesign.Request.EditTemplate -> {
@@ -88,26 +93,29 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
 
     private suspend fun editAccount(account: HysteriaAccount): Boolean {
         val accountDesign = HysteriaAccountDesign(this, account)
-        var result = false
 
         pushDesign(accountDesign)
 
-        try {
+        return try {
             while (isActive) {
                 val request = select<HysteriaAccountDesign.Request?> {
                     events.onReceive { null }
                     accountDesign.requests.onReceive { it }
                 }
-                if (request == null) break
+
                 if (request == HysteriaAccountDesign.Request.Delete) {
                     return false
                 }
+
+                if (request == null) {
+                    break
+                }
             }
+
+            true
         } finally {
             popDesign()
-            result = true // Assume saved on back
         }
-        return result
     }
 
     private suspend fun editTemplate(config: HysteriaConfig) {
