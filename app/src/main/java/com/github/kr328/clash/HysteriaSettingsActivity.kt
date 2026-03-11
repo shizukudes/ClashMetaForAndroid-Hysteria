@@ -94,12 +94,9 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                     events.onReceive { null }
                     accountDesign.requests.onReceive { it }
                 }
+                if (request == null) break
                 if (request == HysteriaAccountDesign.Request.Delete) {
-                    // Handled by returning true/false or similar logic, 
-                    // but for simplicity we just modify the object since it's passed by reference
-                    // and let the caller decide.
-                    // Here, Delete means "remove from list"
-                    return false // Don't save if deleted? Or specific signal.
+                    return false
                 }
             }
         } finally {

@@ -41,15 +41,43 @@ abstract class BaseActivity<D : Design<*>> : AppCompatActivity(),
     protected var activityStarted: Boolean = false
     protected val clashRunning: Boolean
         get() = Remote.broadcasts.clashRunning
+    private val designStack = mutableListOf<Design<*>>()
     protected var design: D? = null
         set(value) {
             field = value
-            if (value != null) {
-                setContentView(value.root)
-            } else {
-                setContentView(View(this))
+            if (designStack.isEmpty()) {
+                if (value != null) {
+                    setContentView(value.root)
+                } else {
+                    setContentView(View(this))
+                }
             }
         }
+
+    fun pushDesign(design: Design<*>) {
+        designStack.add(design)
+        setContentView(design.root)
+    }
+
+    fun popDesign() {
+        if (designStack.isNotEmpty()) {
+            designStack.removeAt(designStack.size - 1)
+        }
+        if (designStack.isNotEmpty()) {
+            setContentView(designStack.last().root)
+        } else {
+            setContentView(this.design?.root ?: View(this))
+        }
+    }
+
+    override fun onBackPressed() {
+        if (designStack.isNotEmpty()) {
+            popDesign()
+            events.trySend(Event.PopDesign)
+            return
+        }
+        super.onBackPressed()
+    }
 
     private var defer: suspend () -> Unit = {}
     private var deferRunning = false
@@ -230,5 +258,6 @@ abstract class BaseActivity<D : Design<*>> : AppCompatActivity(),
         ProfileChanged,
         ProfileUpdateCompleted,
         ProfileUpdateFailed,
+        PopDesign,
     }
 }
