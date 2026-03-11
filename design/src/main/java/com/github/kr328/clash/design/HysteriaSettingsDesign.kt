@@ -8,14 +8,19 @@ import com.github.kr328.clash.design.util.applyFrom
 import com.github.kr328.clash.design.util.bindAppBarElevation
 import com.github.kr328.clash.design.util.layoutInflater
 import com.github.kr328.clash.design.util.root
-import com.github.kr328.clash.service.store.HysteriaStore
+import com.github.kr328.clash.service.model.HysteriaConfig
+import com.github.kr328.clash.service.model.HysteriaAccount
+import java.util.UUID
 
 class HysteriaSettingsDesign(
     context: Context,
-    store: HysteriaStore,
+    val config: HysteriaConfig,
 ) : Design<HysteriaSettingsDesign.Request>(context) {
     enum class Request {
-        GenerateConfig
+        SaveAndGenerate,
+        AddAccount,
+        EditAccount(val account: HysteriaAccount),
+        DeleteAccount(val account: HysteriaAccount)
     }
 
     private val binding = DesignSettingsCommonBinding
@@ -26,95 +31,76 @@ class HysteriaSettingsDesign(
 
     init {
         binding.surface = surface
-
         binding.activityBarLayout.applyFrom(context)
-
         binding.scrollRoot.bindAppBarElevation(binding.activityBarLayout)
+
+        update()
+    }
+
+    fun update() {
+        binding.content.removeAllViews()
 
         val screen = preferenceScreen(context) {
             category(R.string.hysteria_settings)
 
             switch(
-                value = store::enabled,
+                value = config::enabled,
                 icon = R.drawable.ic_baseline_dns,
                 title = R.string.hysteria_enabled,
                 summary = R.string.hysteria_enabled_summary,
             )
 
-            category(R.string.settings)
+            category(R.string.settings) // Using settings as proxy for "Accounts"
+
+            config.accounts.forEach { account ->
+                clickable(
+                    title = TextAdapter.String.from(account.name),
+                    summary = TextAdapter.String.from("${account.serverIp}:${account.serverPortRange}"),
+                    icon = R.drawable.ic_baseline_edit
+                ) {
+                    clicked {
+                        requests.trySend(Request.EditAccount(account))
+                    }
+                }
+            }
+
+            clickable(
+                title = TextAdapter.String.from("Add Account"),
+                icon = R.drawable.ic_baseline_add
+            ) {
+                clicked {
+                    requests.trySend(Request.AddAccount)
+                }
+            }
+
+            category(R.string.clash) // Advanced settings
 
             editableText(
-                value = store::serverIp,
-                adapter = TextAdapter.String,
-                icon = R.drawable.ic_baseline_domain,
-                title = R.string.hysteria_server_ip,
-                summary = R.string.hysteria_server_ip_summary,
-            )
-
-            editableText(
-                value = store::serverPortRange,
-                adapter = TextAdapter.String,
-                icon = R.drawable.ic_baseline_edit,
-                title = R.string.hysteria_server_port_range,
-                summary = R.string.hysteria_server_port_range_summary,
-            )
-
-            editableText(
-                value = store::password,
-                adapter = TextAdapter.String,
-                icon = R.drawable.ic_baseline_edit,
-                title = R.string.hysteria_password,
-                summary = R.string.hysteria_password_summary,
-            )
-
-            editableText(
-                value = store::obfs,
-                adapter = TextAdapter.String,
-                icon = R.drawable.ic_baseline_edit,
-                title = R.string.hysteria_obfs,
-                summary = R.string.hysteria_obfs_summary,
-            )
-
-            editableText(
-                value = store::localPort,
+                value = config::localPort,
                 adapter = NullableTextAdapter.Int,
-                icon = R.drawable.ic_baseline_edit,
+                icon = R.drawable.ic_baseline_numbers,
                 title = R.string.hysteria_local_port,
-                summary = R.string.hysteria_local_port_summary,
             )
 
-            category(R.string.settings)
-
             editableText(
-                value = store::recvWindowConn,
+                value = config::recvWindowConn,
                 adapter = NullableTextAdapter.Int,
-                icon = R.drawable.ic_baseline_edit,
+                icon = R.drawable.ic_baseline_speed,
                 title = R.string.hysteria_recv_window_conn,
-                summary = R.string.hysteria_recv_window_conn_summary,
             )
 
             editableText(
-                value = store::recvWindow,
+                value = config::recvWindow,
                 adapter = NullableTextAdapter.Int,
-                icon = R.drawable.ic_baseline_edit,
+                icon = R.drawable.ic_baseline_speed,
                 title = R.string.hysteria_recv_window,
-                summary = R.string.hysteria_recv_window_summary,
             )
 
             editableText(
-                value = store::coreCount,
-                adapter = NullableTextAdapter.Int,
-                icon = R.drawable.ic_baseline_edit,
-                title = R.string.hysteria_core_count,
-                summary = R.string.hysteria_core_count_summary,
-            )
-
-            editableText(
-                value = store::logLevel,
+                value = config::logLevel,
                 adapter = TextAdapter.String,
                 icon = R.drawable.ic_baseline_assignment,
                 title = R.string.hysteria_log_level,
-                summary = R.string.hysteria_log_level_summary,
             )
 
             category(R.string.action)
@@ -122,10 +108,10 @@ class HysteriaSettingsDesign(
             clickable(
                 title = R.string.generate_config,
                 summary = R.string.generate_config_summary,
-                icon = R.drawable.ic_baseline_add,
+                icon = R.drawable.ic_baseline_auto_fix_high,
             ) {
                 clicked {
-                    requests.trySend(Request.GenerateConfig)
+                    requests.trySend(Request.SaveAndGenerate)
                 }
             }
         }

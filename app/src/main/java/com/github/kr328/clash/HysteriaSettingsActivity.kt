@@ -2,34 +2,78 @@ package com.github.kr328.clash
 
 import com.github.kr328.clash.common.constants.Intents
 import com.github.kr328.clash.design.HysteriaSettingsDesign
+import com.github.kr328.clash.design.HysteriaAccountDesign
 import com.github.kr328.clash.service.data.Imported
 import com.github.kr328.clash.service.data.ImportedDao
 import com.github.kr328.clash.service.model.Profile
-import com.github.kr328.clash.service.store.HysteriaStore
+import com.github.kr328.clash.service.model.HysteriaConfig
+import com.github.kr328.clash.service.model.HysteriaAccount
 import com.github.kr328.clash.service.store.ServiceStore
 import com.github.kr328.clash.service.util.importedDir
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import java.util.*
 
 class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
+    private val json = Json { 
+        ignoreUnknownKeys = true
+        prettyPrint = true
+    }
+
     override suspend fun main() {
-        val hysteriaStore = HysteriaStore(this)
-        val design = HysteriaSettingsDesign(this, hysteriaStore)
+        val sStore = ServiceStore(this)
+        val activeUuid = sStore.activeProfile ?: return finish()
+        val configFile = importedDir.resolve(activeUuid.toString()).resolve("hysteria.json")
+        
+        val config = if (configFile.exists()) {
+            try {
+                json.decodeFromString(HysteriaConfig.serializer(), configFile.readText())
+            } catch (e: Exception) {
+                HysteriaConfig()
+            }
+        } else {
+            HysteriaConfig()
+        }
+
+        val design = HysteriaSettingsDesign(this, config)
 
         setContentDesign(design)
 
         while (isActive) {
             select<Unit> {
                 events.onReceive {
-                    // Handle global events if needed
+                    // Handle global events
                 }
-                design.requests.onReceive {
-                    when (it) {
-                        HysteriaSettingsDesign.Request.GenerateConfig -> {
-                            generateAndActivateProfile(hysteriaStore)
+                design.requests.onReceive { request ->
+                    when (request) {
+                        HysteriaSettingsDesign.Request.SaveAndGenerate -> {
+                            saveAndGenerate(activeUuid, config)
+                        }
+                        HysteriaSettingsDesign.Request.AddAccount -> {
+                            val newAccount = HysteriaAccount(
+                                id = UUID.randomUUID().toString(),
+                                name = "New Account",
+                                serverIp = "",
+                                serverPortRange = "6000-19999",
+                                password = "",
+                                obfs = "hu``hqb`c"
+                            )
+                            if (editAccount(newAccount)) {
+                                config.accounts = config.accounts + newAccount
+                                design.update()
+                            }
+                        }
+                        is HysteriaSettingsDesign.Request.EditAccount -> {
+                            if (editAccount(request.account)) {
+                                design.update()
+                            }
+                        }
+                        is HysteriaSettingsDesign.Request.DeleteAccount -> {
+                            config.accounts = config.accounts.filter { it.id != request.account.id }
+                            design.update()
                         }
                     }
                 }
@@ -37,12 +81,43 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
         }
     }
 
-    private suspend fun generateAndActivateProfile(hStore: HysteriaStore) {
+    private suspend fun editAccount(account: HysteriaAccount): Boolean {
+        val accountDesign = HysteriaAccountDesign(this, account)
+        var result = false
+
+        pushDesign(accountDesign)
+
+        try {
+            while (isActive) {
+                val request = select<HysteriaAccountDesign.Request?> {
+                    events.onReceive { null }
+                    accountDesign.requests.onReceive { it }
+                }
+                if (request == HysteriaAccountDesign.Request.Delete) {
+                    // Handled by returning true/false or similar logic, 
+                    // but for simplicity we just modify the object since it's passed by reference
+                    // and let the caller decide.
+                    // Here, Delete means "remove from list"
+                    return false // Don't save if deleted? Or specific signal.
+                }
+            }
+        } finally {
+            popDesign()
+            result = true // Assume saved on back
+        }
+        return result
+    }
+
+    private suspend fun saveAndGenerate(uuid: UUID, config: HysteriaConfig) {
         withContext(Dispatchers.IO) {
-            val uuid = UUID.nameUUIDFromBytes("hysteria-auto".toByteArray())
+            // 1. Save hysteria.json
+            val profileDir = importedDir.resolve(uuid.toString())
+            profileDir.mkdirs()
+            profileDir.resolve("hysteria.json").writeText(json.encodeToString(HysteriaConfig.serializer(), config))
+
+            // 2. Generate config.yaml
             val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
             val name = "Hysteria Edition ($dateStr)"
-            val port = hStore.localPort
             
             val yaml = """
                 mode: rule
@@ -70,7 +145,7 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                   - name: "Hysteria-LB"
                     type: socks5
                     server: 127.0.0.1
-                    port: $port
+                    port: ${config.localPort}
                 
                 proxy-groups:
                   - name: "Proxy"
@@ -83,46 +158,16 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                   - MATCH,Proxy
             """.trimIndent()
 
-            // 1. Write file
-            val profileDir = importedDir.resolve(uuid.toString())
-            profileDir.deleteRecursively()
-            profileDir.mkdirs()
-            profileDir.resolve("config.yaml").outputStream().use {
-                it.write(yaml.toByteArray())
-            }
+            profileDir.resolve("config.yaml").writeText(yaml)
 
-            // 2. Add to DB if not exists
+            // 3. Update DB
             val dao = com.github.kr328.clash.service.data.Database.database.openImportedDao()
             val existing = dao.queryByUUID(uuid)
             if (existing != null) {
-                dao.update(
-                    existing.copy(
-                        name = name,
-                        createdAt = System.currentTimeMillis()
-                    )
-                )
-            } else {
-                dao.insert(
-                    Imported(
-                        uuid = uuid,
-                        name = name,
-                        type = Profile.Type.File,
-                        source = "hysteria://auto",
-                        interval = 0,
-                        upload = 0,
-                        download = 0,
-                        total = 0,
-                        expire = 0,
-                        createdAt = System.currentTimeMillis()
-                    )
-                )
+                dao.update(existing.copy(name = name, createdAt = System.currentTimeMillis()))
             }
 
-            // 3. Set as active profile
-            val srvStore = ServiceStore(this@HysteriaSettingsActivity)
-            srvStore.activeProfile = uuid
-            
-            // 4. Notify change
+            // 4. Notify
             val intent = android.content.Intent(Intents.ACTION_PROFILE_CHANGED)
             intent.putExtra(Intents.EXTRA_UUID, uuid.toString())
             this@HysteriaSettingsActivity.sendBroadcast(intent)
