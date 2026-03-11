@@ -80,21 +80,21 @@ class HysteriaSettingsDesign(
                 value = config::localPort,
                 adapter = NullableTextAdapter.Int,
                 title = R.string.hysteria_local_port,
-                icon = R.drawable.ic_baseline_numbers,
+                icon = R.drawable.ic_baseline_edit,
             )
 
             editableText(
                 value = config::recvWindowConn,
                 adapter = NullableTextAdapter.Int,
                 title = R.string.hysteria_recv_window_conn,
-                icon = R.drawable.ic_baseline_speed,
+                icon = R.drawable.ic_baseline_edit,
             )
 
             editableText(
                 value = config::recvWindow,
                 adapter = NullableTextAdapter.Int,
                 title = R.string.hysteria_recv_window,
-                icon = R.drawable.ic_baseline_speed,
+                icon = R.drawable.ic_baseline_edit,
             )
 
             editableText(
@@ -108,7 +108,7 @@ class HysteriaSettingsDesign(
 
             clickable(
                 title = R.string.generate_config,
-                icon = R.drawable.ic_baseline_auto_fix_high,
+                icon = R.drawable.ic_baseline_save,
             ) {
                 summary = context.getString(R.string.generate_config_summary)
                 
