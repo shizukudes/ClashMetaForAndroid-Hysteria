@@ -63,6 +63,7 @@
                     app:icon="@drawable/ic_baseline_vpn_lock"
                     app:text="@string/hysteria_settings" />
 
+
             </LinearLayout>
         </com.github.kr328.clash.design.view.ObservableScrollView>
 

@@ -17,3 +17,13 @@ This is a modified version of ClashMetaForAndroid with built-in Hysteria support
 ## Credits
 - Based on [ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid)
 - Core binaries from `zivpn-xsocks-core`
+
+## Perbedaan singkat vs Clash Meta Alpha Official
+- **Fokus Hysteria bawaan**: fork ini menambah alur konfigurasi Hysteria langsung di aplikasi (akun, template, generate config).
+- **Binary tambahan**: membawa `libuz` + `libload` untuk mode Hysteria/load-balance lokal.
+- **Workflow rilis custom**: rilis fokus jalur alpha dengan penyesuaian untuk build fork Hysteria.
+- **Official Alpha** lebih general-purpose dan mengikuti upstream behavior tanpa penyesuaian khusus Hysteria pada UI/alur profile seperti di fork ini.
+
+
+## Donate
+- Traktir orang gabut coffee ☕: https://saweria.co/Damnwhoknows

@@ -19,6 +19,7 @@ class HysteriaSettingsDesign(
         object SaveAndGenerate : Request()
         object AddAccount : Request()
         object EditTemplate : Request()
+        object OpenDonate : Request()
         data class EditAccount(val account: HysteriaAccount) : Request()
         data class DeleteAccount(val account: HysteriaAccount) : Request()
     }
@@ -54,12 +55,12 @@ class HysteriaSettingsDesign(
 
             config.accounts.forEach { account ->
                 clickable(
-                    title = R.string.edit,
+                    title = R.string.name,
                     icon = R.drawable.ic_baseline_dns,
                 ) {
                     title = account.name
-                    summary = "${if (account.enabled) "[ON]" else "[OFF]"} ${account.serverIp}:${account.serverPortRange}"
-                    
+                    summary = "${if (account.enabled) "ON" else "OFF"} • ${account.serverIp}:${account.serverPortRange}"
+
                     clicked {
                         requests.trySend(Request.EditAccount(account))
                     }
@@ -115,6 +116,18 @@ class HysteriaSettingsDesign(
                     requests.trySend(Request.EditTemplate)
                 }
             }
+
+            clickable(
+                title = R.string.traktir_kopi,
+                icon = R.drawable.ic_baseline_volunteer_activism,
+            ) {
+                summary = context.getString(R.string.donate_saweria_url)
+
+                clicked {
+                    requests.trySend(Request.OpenDonate)
+                }
+            }
+
 
             category(R.string.action)
 
