@@ -53,13 +53,12 @@ class HysteriaSettingsDesign(
             category(R.string.settings)
 
             config.accounts.forEach { account ->
-                switch(
-                    value = account::enabled,
-                    icon = R.drawable.ic_baseline_dns,
+                clickable(
                     title = R.string.edit,
+                    icon = R.drawable.ic_baseline_dns,
                 ) {
                     title = account.name
-                    summary = "${account.serverIp}:${account.serverPortRange}"
+                    summary = "${if (account.enabled) "[ON]" else "[OFF]"} ${account.serverIp}:${account.serverPortRange}"
                     
                     clicked {
                         requests.trySend(Request.EditAccount(account))

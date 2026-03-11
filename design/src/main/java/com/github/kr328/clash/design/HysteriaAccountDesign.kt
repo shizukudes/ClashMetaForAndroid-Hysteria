@@ -32,6 +32,12 @@ class HysteriaAccountDesign(
         val screen = preferenceScreen(context) {
             category(R.string.settings)
 
+            switch(
+                value = account::enabled,
+                icon = R.drawable.ic_baseline_dns,
+                title = R.string.enabled,
+            )
+
             editableText(
                 value = account::name,
                 adapter = TextAdapter.String,
