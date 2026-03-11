@@ -22,6 +22,6 @@ This is a modified version of ClashMetaForAndroid with built-in Hysteria support
 - **Fokus Hysteria/ZIVPN**: fork ini menambah alur konfigurasi Hysteria langsung di aplikasi (akun, template, generate config).
 - **Binary tambahan**: membawa `libuz` + `libload` untuk mode Hysteria/load-balance lokal.
 - **Official Alpha** lebih general-purpose dan mengikuti upstream behavior tanpa penyesuaian khusus Hysteria pada UI/alur profile seperti di fork ini.
--
+- FUNGSI CLASH BISA DI GUNAKAN SEPERTI BIASANYA DISABLE HYTERIA MODE KALO MAU JADI CLASH META ALPHA MODE
 ## Donate
 - Traktir orang gabut coffee ☕: https://saweria.co/Damnwhoknows
