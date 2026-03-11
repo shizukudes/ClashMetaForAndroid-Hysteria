@@ -53,10 +53,12 @@ class HysteriaSettingsDesign(
 
             config.accounts.forEach { account ->
                 clickable(
-                    titleString = account.name,
-                    summaryString = "${account.serverIp}:${account.serverPortRange}",
+                    title = R.string.edit,
                     icon = R.drawable.ic_baseline_edit
                 ) {
+                    title = account.name
+                    summary = "${account.serverIp}:${account.serverPortRange}"
+                    
                     clicked {
                         requests.trySend(Request.EditAccount(account))
                     }
@@ -77,42 +79,39 @@ class HysteriaSettingsDesign(
             editableText(
                 value = config::localPort,
                 adapter = NullableTextAdapter.Int,
-                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_local_port,
-                summary = R.string.hysteria_local_port_summary,
+                icon = R.drawable.ic_baseline_numbers,
             )
 
             editableText(
                 value = config::recvWindowConn,
                 adapter = NullableTextAdapter.Int,
-                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_recv_window_conn,
-                summary = R.string.hysteria_recv_window_conn_summary,
+                icon = R.drawable.ic_baseline_speed,
             )
 
             editableText(
                 value = config::recvWindow,
                 adapter = NullableTextAdapter.Int,
-                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_recv_window,
-                summary = R.string.hysteria_recv_window_summary,
+                icon = R.drawable.ic_baseline_speed,
             )
 
             editableText(
                 value = config::logLevel,
                 adapter = TextAdapter.String,
-                icon = R.drawable.ic_baseline_assignment,
                 title = R.string.hysteria_log_level,
-                summary = R.string.hysteria_log_level_summary,
+                icon = R.drawable.ic_baseline_assignment,
             )
 
             category(R.string.action)
 
             clickable(
                 title = R.string.generate_config,
-                summary = R.string.generate_config_summary,
-                icon = R.drawable.ic_baseline_add,
+                icon = R.drawable.ic_baseline_auto_fix_high,
             ) {
+                summary = context.getString(R.string.generate_config_summary)
+                
                 clicked {
                     requests.trySend(Request.SaveAndGenerate)
                 }

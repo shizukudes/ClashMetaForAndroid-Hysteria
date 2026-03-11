@@ -35,40 +35,36 @@ class HysteriaAccountDesign(
             editableText(
                 value = account::name,
                 adapter = TextAdapter.String,
-                icon = R.drawable.ic_baseline_edit,
                 title = R.string.name,
+                icon = R.drawable.ic_baseline_edit,
             )
 
             editableText(
                 value = account::serverIp,
                 adapter = TextAdapter.String,
-                icon = R.drawable.ic_baseline_domain,
                 title = R.string.hysteria_server_ip,
-                summary = R.string.hysteria_server_ip_summary,
+                icon = R.drawable.ic_baseline_domain,
             )
 
             editableText(
                 value = account::serverPortRange,
                 adapter = TextAdapter.String,
-                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_server_port_range,
-                summary = R.string.hysteria_server_port_range_summary,
+                icon = R.drawable.ic_baseline_edit,
             )
 
             editableText(
                 value = account::password,
                 adapter = TextAdapter.String,
-                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_password,
-                summary = R.string.hysteria_password_summary,
+                icon = R.drawable.ic_baseline_edit,
             )
 
             editableText(
                 value = account::obfs,
                 adapter = TextAdapter.String,
-                icon = R.drawable.ic_baseline_edit,
                 title = R.string.hysteria_obfs,
-                summary = R.string.hysteria_obfs_summary,
+                icon = R.drawable.ic_baseline_edit,
             )
 
             category(R.string.action)
