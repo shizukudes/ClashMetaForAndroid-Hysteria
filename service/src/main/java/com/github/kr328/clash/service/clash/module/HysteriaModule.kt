@@ -2,6 +2,7 @@ package com.github.kr328.clash.service.clash.module
 
 import android.app.Service
 import com.github.kr328.clash.common.log.Log
+import com.github.kr328.clash.service.model.HysteriaAccount
 import com.github.kr328.clash.service.model.HysteriaConfig
 import com.github.kr328.clash.service.store.ServiceStore
 import com.github.kr328.clash.service.util.importedDir
@@ -31,10 +32,11 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             return
         }
 
-        if (!config.enabled || config.accounts.isEmpty()) return
+        val enabledAccounts = config.accounts.filter { it.enabled }
+        if (!config.enabled || enabledAccounts.isEmpty()) return
 
         try {
-            startCores(config)
+            startCores(config, enabledAccounts)
             
             suspendCancellableCoroutine<Unit> { 
                 it.invokeOnCancellation {
@@ -48,7 +50,7 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         }
     }
 
-    private fun startCores(config: HysteriaConfig) {
+    private fun startCores(config: HysteriaConfig, enabledAccounts: List<HysteriaAccount>) {
         val libDir = service.applicationInfo.nativeLibraryDir
         val libUz = File(libDir, "libuz.so").absolutePath
         val libLoad = File(libDir, "libload.so").absolutePath
@@ -62,7 +64,7 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             else -> "info"
         }
 
-        config.accounts.forEachIndexed { index, account ->
+        enabledAccounts.forEachIndexed { index, account ->
             val port = 20080 + index
             
             val hyConfig = JSONObject()
