@@ -253,7 +253,11 @@ object ProfileProcessor {
             source.isEmpty() && type != Profile.Type.File ->
                 throw IllegalArgumentException("Invalid url")
 
-            source.isNotEmpty() && scheme != "https" && scheme != "http" && scheme != "content" ->
+            source.isNotEmpty() &&
+                scheme != "https" &&
+                scheme != "http" &&
+                scheme != "content" &&
+                !(type == Profile.Type.File && scheme == "hysteria") ->
                 throw IllegalArgumentException("Unsupported url $source")
 
             interval != 0L && TimeUnit.MILLISECONDS.toMinutes(interval) < 15 ->
