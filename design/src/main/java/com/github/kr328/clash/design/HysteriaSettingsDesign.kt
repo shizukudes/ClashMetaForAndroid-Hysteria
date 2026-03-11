@@ -64,7 +64,7 @@ class HysteriaSettingsDesign(
             }
 
             clickable(
-                title = R.string.add,
+                title = R.string.edit,
                 icon = R.drawable.ic_baseline_add
             ) {
                 clicked {
@@ -72,7 +72,7 @@ class HysteriaSettingsDesign(
                 }
             }
 
-            category(R.string.clash)
+            category(R.string.settings)
 
             editableText(
                 value = config::localPort,
