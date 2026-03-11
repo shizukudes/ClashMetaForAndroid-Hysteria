@@ -7,20 +7,17 @@ import com.github.kr328.clash.core.Clash
 import com.github.kr328.clash.service.StatusProvider
 import com.github.kr328.clash.service.data.ImportedDao
 import com.github.kr328.clash.service.data.SelectionDao
-import com.github.kr328.clash.service.store.HysteriaStore
 import com.github.kr328.clash.service.store.ServiceStore
 import com.github.kr328.clash.service.util.importedDir
 import com.github.kr328.clash.service.util.sendProfileLoaded
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.selects.select
-import kotlinx.serialization.json.JsonPrimitive
 import java.util.*
 
 class ConfigurationModule(service: Service) : Module<ConfigurationModule.LoadException>(service) {
     data class LoadException(val message: String)
 
     private val store = ServiceStore(service)
-    private val hStore = HysteriaStore(service)
     private val reload = Channel<Unit>(Channel.CONFLATED)
 
     override suspend fun run() {
@@ -59,38 +56,17 @@ class ConfigurationModule(service: Service) : Module<ConfigurationModule.LoadExc
                     ?: throw NullPointerException("No profile selected")
 
                 val override = Clash.queryOverride(Clash.OverrideSlot.Session)
-
-                if (hStore.enabled) {
-                    val hysteriaProxy = mapOf(
-                        "name" to JsonPrimitive("Hysteria-LB"),
-                        "type" to JsonPrimitive("socks5"),
-                        "server" to JsonPrimitive("127.0.0.1"),
-                        "port" to JsonPrimitive(hStore.localPort),
-                    )
-
-                    override.proxies = listOf(hysteriaProxy)
-                    
-                    val hysteriaGroup = mapOf(
-                        "name" to JsonPrimitive("Proxy"),
-                        "type" to JsonPrimitive("select"),
-                        "proxies" to kotlinx.serialization.json.buildJsonArray {
-                            add(JsonPrimitive("Hysteria-LB"))
-                            add(JsonPrimitive("DIRECT"))
-                        }
-                    )
-                    override.proxyGroups = listOf(hysteriaGroup)
-                } else {
-                    override.proxies = null
-                    override.proxyGroups = null
-                }
-
+                // Avoid forcing runtime proxy/group override for Hysteria.
+                // Use profile config.yaml groups so Proxy/Rule mode menu remains consistent.
+                override.proxies = null
+                override.proxyGroups = null
                 Clash.patchOverride(Clash.OverrideSlot.Session, override)
 
                 Clash.load(service.importedDir.resolve(active.uuid.toString())).await()
 
                 val remove = SelectionDao().querySelections(active.uuid)
                     .filterNot { 
-                        (hStore.enabled && it.proxy == "Proxy") || Clash.patchSelector(it.proxy, it.selected) 
+                        Clash.patchSelector(it.proxy, it.selected) 
                     }
                     .map { it.proxy }
 
@@ -106,4 +82,5 @@ class ConfigurationModule(service: Service) : Module<ConfigurationModule.LoadExc
             }
         }
     }
+
 }
