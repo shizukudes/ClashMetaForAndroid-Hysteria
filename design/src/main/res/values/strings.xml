@@ -359,15 +359,26 @@
     <string name="shortcut_stop_long">Stop Clash service</string>
     <string name="hysteria_settings">Hysteria Settings</string>
     <string name="hysteria_enabled">Enable Hysteria</string>
+    <string name="hysteria_enabled_summary">Run Hysteria core in background</string>
     <string name="hysteria_server_ip">Server IP/Domain</string>
-    <string name="hysteria_server_port_range">Port Range (e.g. 10000-20000)</string>
+    <string name="hysteria_server_ip_summary">Hysteria server address</string>
+    <string name="hysteria_server_port_range">Port Range</string>
+    <string name="hysteria_server_port_range_summary">e.g. 6000-19999</string>
     <string name="hysteria_password">Password</string>
+    <string name="hysteria_password_summary">Auth password for server</string>
     <string name="hysteria_obfs">Obfuscation</string>
+    <string name="hysteria_obfs_summary">Password for obfuscation protocol</string>
     <string name="hysteria_local_port">Local SOCKS Port</string>
+    <string name="hysteria_local_port_summary">Port for libload balancer (default 7777)</string>
     <string name="hysteria_recv_window_conn">Recv Window Conn</string>
+    <string name="hysteria_recv_window_conn_summary">QUIC receive window per connection</string>
     <string name="hysteria_recv_window">Recv Window</string>
+    <string name="hysteria_recv_window_summary">QUIC receive window per stream</string>
     <string name="hysteria_core_count">Core Count</string>
+    <string name="hysteria_core_count_summary">Number of Hysteria instances to run</string>
     <string name="hysteria_log_level">Log Level</string>
+    <string name="hysteria_log_level_summary">info, debug, error, or silent</string>
     <string name="action">Action</string>
     <string name="generate_config">Generate &amp; Activate Profile</string>
+    <string name="generate_config_summary">Create a Hysteria-optimized Clash profile</string>
 </resources>

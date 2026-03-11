@@ -54,6 +54,18 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                 tcp-concurrent: true
                 external-controller: 127.0.0.1:9090
                 
+                dns:
+                  enable: true
+                  ipv6: false
+                  enhanced-mode: fake-ip
+                  fake-ip-range: 198.18.0.1/16
+                  default-nameserver:
+                    - 1.1.1.1
+                    - 8.8.8.8
+                  nameserver:
+                    - https://1.1.1.1/dns-query
+                    - https://1.0.0.1/dns-query
+                
                 proxies:
                   - name: "Hysteria-LB"
                     type: socks5
