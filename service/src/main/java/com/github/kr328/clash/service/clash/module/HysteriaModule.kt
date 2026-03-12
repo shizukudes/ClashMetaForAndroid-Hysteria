@@ -108,7 +108,10 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             useTun2Socks = true
             socksPort = 20080
             udpgwServer = runtimeAccounts[0].udpgwServer
-            Log.i("HysteriaModule: Tun2Socks Core enabled (SOCKS 127.0.0.1:$socksPort, UDPGW: $udpgwServer)")
+            Log.i("HysteriaModule: Tun2Socks Core C enabled (SOCKS 127.0.0.1:$socksPort, UDPGW: $udpgwServer)")
+            
+            // Override the localPort for LoadBalancer to match Tun2Socks expectations
+            config.localPort = socksPort
             
             val libDir = service.applicationInfo.nativeLibraryDir
             startPdnsd(libDir, service.filesDir)

@@ -273,7 +273,7 @@ inline static char *strndup(const char *s, size_t n)
 }
 #endif
 
-#if !defined(HAVE_STPCPY) && !defined(__ANDROID__)
+#if 0
 inline static char *stpcpy (char *dest, const char *src)
   __attribute__((always_inline));
 inline static char *stpcpy (char *dest, const char *src)
@@ -287,7 +287,7 @@ inline static char *stpcpy (char *dest, const char *src)
 }
 #endif
 
-#if !defined(HAVE_MEMPCPY) && !defined(__ANDROID__)
+#if 0
 inline static void *mempcpy(void *dest, const void *src, size_t len)
   __attribute__((always_inline));
 inline static void *mempcpy(void *dest, const void *src, size_t len)
@@ -297,15 +297,15 @@ inline static void *mempcpy(void *dest, const void *src, size_t len)
 }
 #endif
 
-#if !defined(HAVE_GETLINE) && !defined(__ANDROID__)
+#if 0
 int getline(char **lineptr, size_t *n, FILE *stream);
 #endif
 
-#if !defined(HAVE_ASPRINTF) && !defined(__ANDROID__)
+#if 0
 int asprintf (char **lineptr, const char *format, ...);
 #endif
 
-#if !defined(HAVE_VASPRINTF) && !defined(__ANDROID__)
+#if 0
 #include <stdarg.h>
 int vasprintf (char **lineptr, const char *format, va_list va);
 #endif
