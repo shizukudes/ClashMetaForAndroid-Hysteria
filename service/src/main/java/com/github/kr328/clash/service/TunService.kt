@@ -229,7 +229,7 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
         if (HysteriaModule.useTun2Socks) {
             val socks = "127.0.0.1:${HysteriaModule.socksPort}"
             val udpgw = HysteriaModule.udpgwServer
-            val dns = "127.0.0.1:10535" // pdnsd port
+            val dns = "127.0.0.1:1053" // Redirect to Clash DNS
             attachTun2Socks(device.fd, TUN_MTU, socks, udpgw, dns)
         } else {
             attach(device)

@@ -22,58 +22,9 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         var useTun2Socks: Boolean = false
         var socksPort: Int = 0
         var udpgwServer: String = ""
-        private var pdnsdProcess: Process? = null
 
         fun requestStop() {
             useTun2Socks = false
-            pdnsdProcess?.destroy()
-            pdnsdProcess = null
-        }
-    }
-
-    private fun startPdnsd(libDir: String, filesDir: File) {
-        val pdnsdBat = File(libDir, "libpdnsd.so") // Built as executable but named as .so by NDK
-        if (!pdnsdBat.exists()) {
-            Log.e("HysteriaModule: pdnsd binary not found in $libDir")
-            return
-        }
-
-        val confFile = File(filesDir, "pdnsd.conf")
-        val cacheFile = File(filesDir, "pdnsd.cache")
-        
-        if (!cacheFile.exists()) cacheFile.createNewFile()
-
-        val confContent = """
-            global {
-                perm_cache=1024;
-                cache_dir="${filesDir.absolutePath}";
-                server_ip=127.0.0.1;
-                server_port=10535;
-                query_method=tcp_only;
-                run_as="root";
-                status_ctl=on;
-            }
-            server {
-                label="clash";
-                ip=127.0.0.1;
-                port=1053;
-                timeout=4;
-                uptest=none;
-            }
-        """.trimIndent()
-        
-        confFile.writeText(confContent)
-
-        try {
-            pdnsdProcess?.destroy()
-            val cmd = listOf(pdnsdBat.absolutePath, "-c", confFile.absolutePath, "-g")
-            pdnsdProcess = ProcessBuilder(cmd)
-                .directory(filesDir)
-                .redirectErrorStream(true)
-                .start()
-            Log.i("HysteriaModule: pdnsd started on port 10535")
-        } catch (e: Exception) {
-            Log.e("HysteriaModule: Failed to start pdnsd: ${e.message}")
         }
     }
 
@@ -112,18 +63,9 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             
             // Override the localPort for LoadBalancer to match Tun2Socks expectations
             config.localPort = socksPort
-            
-            val libDir = service.applicationInfo.nativeLibraryDir
-            startPdnsd(libDir, service.filesDir)
         }
 
         try {
-            if (runtimeAccounts.size == 1) {
-                Log.i("HysteriaModule: Using selected account ${runtimeAccounts[0].name}")
-            } else {
-                Log.i("HysteriaModule: Using load-balance mode with ${runtimeAccounts.size} accounts")
-            }
-
             startCores(config, runtimeAccounts)
 
             suspendCancellableCoroutine<Unit> {
@@ -204,42 +146,21 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         Log.i("HysteriaModule: Stopping cores")
 
         val snapshot = processes.toList()
-
-        snapshot.forEach { process ->
-            runCatching {
-                process.destroy()
-            }.onFailure {
-                Log.w("HysteriaModule: Failed to send destroy: ${it.message}")
-            }
-        }
-
-        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(750)
-        while (System.nanoTime() < deadline && snapshot.any { it.isAlive }) {
-            Thread.sleep(50)
-        }
-
-        snapshot.forEach { process ->
-            if (process.isAlive) {
-                runCatching {
-                    process.destroyForcibly()
-                }.onFailure {
-                    Log.w("HysteriaModule: Failed to force destroy: ${it.message}")
-                }
-            }
-        }
-
-        val hasAliveProcesses = snapshot.any { it.isAlive }
-
-        if (hasAliveProcesses) {
-            val killCommand = "pkill -9 libuz; pkill -9 libload; pkill -f libuz.so; pkill -f libload.so"
-            runCatching {
-                Runtime.getRuntime().exec(arrayOf("sh", "-c", killCommand)).waitFor(1, TimeUnit.SECONDS)
-                Log.w("HysteriaModule: Fallback force-kill with pkill")
-            }.onFailure {
-                Log.w("HysteriaModule: Fallback force-kill failed: ${it.message}")
-            }
-        }
-
         processes.clear()
+
+        snapshot.forEach {
+            it.destroy()
+        }
+
+        snapshot.forEach {
+            it.waitFor(2, TimeUnit.SECONDS)
+        }
+
+        try {
+            val killCommand = "pkill -9 libuz; pkill -9 libload; pkill -f libuz.so; pkill -f libload.so"
+            Runtime.getRuntime().exec(arrayOf("sh", "-c", killCommand)).waitFor()
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
 }
