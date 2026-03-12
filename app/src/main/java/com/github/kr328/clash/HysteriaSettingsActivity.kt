@@ -7,11 +7,13 @@ import com.github.kr328.clash.design.HysteriaSettingsDesign
 import com.github.kr328.clash.design.HysteriaTemplateDesign
 import com.github.kr328.clash.design.util.showExceptionToast
 import com.github.kr328.clash.service.data.Database
+import com.github.kr328.clash.service.data.Imported
 import com.github.kr328.clash.service.model.HysteriaAccount
 import com.github.kr328.clash.service.model.HysteriaConfig
 import com.github.kr328.clash.service.model.Profile
 import com.github.kr328.clash.service.store.ServiceStore
 import com.github.kr328.clash.service.util.importedDir
+import com.github.kr328.clash.service.util.pendingDir
 import com.github.kr328.clash.util.withProfile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
@@ -183,7 +185,12 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
         validateConfig(config)
 
         withContext(Dispatchers.IO) {
-            val profileDir = importedDir.resolve(uuid.toString())
+            val importedProfile = withProfile { queryByUUID(uuid) }?.imported == true
+            val profileDir = if (importedProfile) {
+                importedDir.resolve(uuid.toString())
+            } else {
+                pendingDir.resolve(uuid.toString())
+            }
             profileDir.mkdirs()
 
             val template = if (config.yamlTemplate.isBlank()) {
@@ -204,6 +211,10 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                 .writeText(json.encodeToString(HysteriaConfig.serializer(), config))
             profileDir.resolve("config.yaml").writeText(yaml)
 
+            if (!importedProfile) {
+                withProfile { commit(uuid) }
+            }
+
             val name = when {
                 activeAccount != null -> "Hysteria: ${activeAccount.name}"
                 config.accounts.any { it.enabled } -> "Hysteria-LB (${config.accounts.count { it.enabled }} Accounts)"
@@ -214,6 +225,21 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
             val existing = dao.queryByUUID(uuid)
             if (existing != null) {
                 dao.update(existing.copy(name = name))
+            } else {
+                dao.insert(
+                    Imported(
+                        uuid = uuid,
+                        name = name,
+                        type = Profile.Type.File,
+                        source = "",
+                        interval = 0L,
+                        upload = 0L,
+                        download = 0L,
+                        total = 0L,
+                        expire = 0L,
+                        createdAt = System.currentTimeMillis(),
+                    )
+                )
             }
 
             val intent = android.content.Intent(Intents.ACTION_PROFILE_CHANGED)
