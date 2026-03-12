@@ -18,9 +18,22 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
     private val processes = mutableListOf<Process>()
     private val json = Json { ignoreUnknownKeys = true }
 
+    companion object {
+        var useTun2Socks: Boolean = false
+        var socksPort: Int = 0
+        var udpgwServer: String = ""
+
+        fun requestStop() {
+            useTun2Socks = false
+        }
+    }
+
     override suspend fun run() {
         val activeUuid = serviceStore.activeProfile ?: return
         val configFile = service.importedDir.resolve(activeUuid.toString()).resolve("hysteria.json")
+        
+        // Reset state
+        useTun2Socks = false
 
         if (!configFile.exists()) {
             Log.i("HysteriaModule: No hysteria.json found for profile $activeUuid")
@@ -41,6 +54,13 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             ?.let { activeId -> enabledAccounts.firstOrNull { it.id == activeId } }
             ?.let { listOf(it) }
             ?: enabledAccounts
+
+        if (runtimeAccounts.isNotEmpty() && runtimeAccounts[0].tunCore == "Tun2Socks") {
+            useTun2Socks = true
+            socksPort = 20080
+            udpgwServer = runtimeAccounts[0].udpgwServer
+            Log.i("HysteriaModule: Tun2Socks Core enabled (SOCKS 127.0.0.1:$socksPort, UDPGW: $udpgwServer)")
+        }
 
         try {
             if (runtimeAccounts.size == 1) {

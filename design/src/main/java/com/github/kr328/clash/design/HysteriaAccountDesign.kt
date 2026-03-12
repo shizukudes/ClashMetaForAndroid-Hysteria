@@ -73,6 +73,21 @@ class HysteriaAccountDesign(
                 icon = R.drawable.ic_baseline_edit,
             )
 
+            selectable(
+                value = account::tunCore,
+                options = listOf("Clash", "Tun2Socks"),
+                title = "Tunnel Core",
+                icon = R.drawable.ic_baseline_settings,
+                adapter = TextAdapter.String,
+            )
+
+            editableText(
+                value = account::udpgwServer,
+                adapter = TextAdapter.String,
+                title = "UDPGW Server",
+                icon = R.drawable.ic_baseline_edit,
+            )
+
             category(R.string.action)
 
             clickable(

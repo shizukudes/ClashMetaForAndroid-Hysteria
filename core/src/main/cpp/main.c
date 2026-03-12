@@ -128,6 +128,43 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun(JNIEnv *env, jobje
     startTun(fd, _stack, _gateway, _portal, _dns, _interface);
 }
 
+extern int tun2socks_main(int argc, char **argv);
+
+JNIEXPORT void JNICALL
+Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun2Socks(JNIEnv *env, jobject thiz,
+                                                                    jint fd,
+                                                                    jint mtu,
+                                                                    jstring socksServer,
+                                                                    jstring udpgwServer) {
+    TRACE_METHOD();
+
+    const char *socks = (*env)->GetStringUTFChars(env, socksServer, 0);
+    const char *udpgw = (*env)->GetStringUTFChars(env, udpgwServer, 0);
+
+    char fd_str[32];
+    sprintf(fd_str, "%d", fd);
+    char mtu_str[32];
+    sprintf(mtu_str, "%d", mtu);
+
+    char *argv[] = {
+        "tun2socks",
+        "--netif-ipaddr", "172.19.0.2",
+        "--netif-netmask", "255.255.255.252",
+        "--socks-server-addr", (char *)socks,
+        "--udpgw-remote-server-addr", (char *)udpgw,
+        "--udpgw-transparent-dns",
+        "--tunfd", fd_str,
+        "--tunmtu", mtu_str,
+        "--loglevel", "3",
+        NULL
+    };
+
+    tun2socks_main(15, argv);
+
+    (*env)->ReleaseStringUTFChars(env, socksServer, socks);
+    (*env)->ReleaseStringUTFChars(env, udpgwServer, udpgw);
+}
+
 JNIEXPORT void JNICALL
 Java_com_github_kr328_clash_core_bridge_Bridge_nativeStopTun(JNIEnv *env, jobject thiz) {
     TRACE_METHOD();

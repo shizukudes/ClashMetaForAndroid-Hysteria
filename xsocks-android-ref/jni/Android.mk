@@ -98,7 +98,8 @@ TUN2SOCKS_SOURCES := \
 		system/BDatagram_unix.c \
         flowextra/PacketPassInactivityMonitor.c \
         tun2socks/SocksUdpGwClient.c \
-        udpgw_client/UdpGwClient.c
+        udpgw_client/UdpGwClient.c \
+        custom/BTimer_unix.c \
 
 LOCAL_MODULE := tun2socks
 

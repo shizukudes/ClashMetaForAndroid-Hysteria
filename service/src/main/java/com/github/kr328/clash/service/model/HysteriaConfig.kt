@@ -11,6 +11,8 @@ data class HysteriaAccount(
     var password: String,
     var obfs: String,
     var enabled: Boolean = true,
+    var tunCore: String = "Clash", // "Clash" or "Tun2Socks"
+    var udpgwServer: String = "127.0.0.1:7300",
 )
 
 @Serializable

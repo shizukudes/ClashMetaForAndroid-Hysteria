@@ -86,6 +86,15 @@ object Clash {
         })
     }
 
+    fun startTun2Socks(
+        fd: Int,
+        mtu: Int,
+        socksServer: String,
+        udpgwServer: String
+    ) {
+        Bridge.nativeStartTun2Socks(fd, mtu, socksServer, udpgwServer)
+    }
+
     fun stopTun() {
         Bridge.nativeStopTun()
     }
