@@ -90,9 +90,10 @@ object Clash {
         fd: Int,
         mtu: Int,
         socksServer: String,
-        udpgwServer: String
+        udpgwServer: String,
+        dnsServer: String
     ) {
-        Bridge.nativeStartTun2Socks(fd, mtu, socksServer, udpgwServer)
+        Bridge.nativeStartTun2Socks(fd, mtu, socksServer, udpgwServer, dnsServer)
     }
 
     fun stopTun() {

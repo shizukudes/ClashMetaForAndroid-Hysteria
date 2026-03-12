@@ -7,6 +7,10 @@ on:
       release_tag:
         description: 'Tag release GitHub (opsional, contoh: v2.11.24-alpha1)'
         required: false
+      create_release:
+        description: 'Buat release GitHub?'
+        type: boolean
+        default: false
   push:
     branches:
       - main
@@ -130,7 +134,7 @@ jobs:
 
       - name: Publish GitHub Release (Alpha)
         uses: softprops/action-gh-release@v1
-        if: ${{ success() && github.event_name == 'workflow_dispatch' }}
+        if: ${{ success() && github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true' }}
         with:
           tag_name: ${{ github.event.inputs.release_tag != '' && github.event.inputs.release_tag || format('alpha-{0}', github.run_number) }}
           name: ${{ github.event.inputs.release_tag != '' && github.event.inputs.release_tag || format('alpha-{0}', github.run_number) }}
