@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"time"
 
 	C "github.com/metacubex/mihomo/constant"
+	"github.com/metacubex/mihomo/transport/socks5"
 	"github.com/metacubex/mihomo/transport/udpgw"
 )
 
@@ -17,10 +19,12 @@ type UdpGw struct {
 
 type UdpGwOption struct {
 	BasicOption
-	Name   string `proxy:"name"`
-	Server string `proxy:"server"`
-	Port   int    `proxy:"port"`
-	UDP    bool   `proxy:"udp,omitempty"`
+	Name           string `proxy:"name"`
+	Server         string `proxy:"server"`
+	Port           int    `proxy:"port"`
+	UDP            bool   `proxy:"udp,omitempty"`
+	SocksServer    string `proxy:"socks-server,omitempty"`
+	SocksPort      int    `proxy:"socks-port,omitempty"`
 }
 
 // StreamConnContext implements C.ProxyAdapter
@@ -35,9 +39,26 @@ func (u *UdpGw) DialContext(ctx context.Context, metadata *C.Metadata) (_ C.Conn
 
 // ListenPacketContext implements C.ProxyAdapter
 func (u *UdpGw) ListenPacketContext(ctx context.Context, metadata *C.Metadata) (_ C.PacketConn, err error) {
-	c, err := u.dialer.DialContext(ctx, "tcp", u.addr)
-	if err != nil {
-		return nil, fmt.Errorf("%s connect error: %w", u.addr, err)
+	var c net.Conn
+	if u.option.SocksServer != "" && u.option.SocksPort > 0 {
+		socksAddr := net.JoinHostPort(u.option.SocksServer, strconv.Itoa(u.option.SocksPort))
+		c, err = u.dialer.DialContext(ctx, "tcp", socksAddr)
+		if err != nil {
+			return nil, fmt.Errorf("udpgw socks connect error: %w", err)
+		}
+		c.SetDeadline(time.Now().Add(time.Second * 15))
+		
+		// Perform SOCKS5 Handshake
+		if err = socks5.ClientHandshake(c, socksAddr, socks5.CmdConnect, u.option.Server, strconv.Itoa(u.option.Port), nil); err != nil {
+			c.Close()
+			return nil, fmt.Errorf("udpgw socks handshake error: %w", err)
+		}
+		c.SetDeadline(time.Time{})
+	} else {
+		c, err = u.dialer.DialContext(ctx, "tcp", u.addr)
+		if err != nil {
+			return nil, fmt.Errorf("%s connect error: %w", u.addr, err)
+		}
 	}
 
 	pc := udpgw.NewPacketConn(c)

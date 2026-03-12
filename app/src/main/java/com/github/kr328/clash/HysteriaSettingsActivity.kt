@@ -415,7 +415,7 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
     
                 patchedYaml = patchedYaml.substring(0, udpgwBlockStart.range.first) + patchedBlock + patchedYaml.substring(blockEndExclusive)
             } else {
-                val udpgwEntry = "  - name: \"Hysteria-UDPGW\"\n    type: udpgw\n    server: 127.0.0.1\n    port: ${config.udpgwPort}"
+                val udpgwEntry = "  - name: \"Hysteria-UDPGW\"\n    type: udpgw\n    server: 127.0.0.1\n    port: ${config.udpgwPort}\n    socks-server: 127.0.0.1\n    socks-port: ${config.localPort}"
                 patchedYaml = if (PROXIES_HEADER_REGEX.containsMatchIn(patchedYaml)) {
                     patchedYaml.replaceFirst(PROXIES_HEADER_REGEX, "proxies:\n$udpgwEntry\n")
                 } else {
