@@ -386,4 +386,8 @@
     <string name="udp_forwarding">UDP Forwarding (UDPGW)</string>
     <string name="udp_forwarding_summary">Forward UDP traffic via badvpn-udpgw</string>
     <string name="udpgw_port">UDPGW Port</string>
+    <string name="hysteria_tun_core">Tunnel Core</string>
+    <string name="hysteria_udpgw_server">UDPGW Server</string>
+    <string name="hysteria_core_clash">Clash (Go)</string>
+    <string name="hysteria_core_tun2socks">Tun2Socks (C)</string>
 </resources>
