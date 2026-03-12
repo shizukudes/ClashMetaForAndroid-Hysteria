@@ -422,8 +422,19 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                     "$patchedYaml\n\nproxies:\n$udpgwEntry\n"
                 }
             }
-            
-            // Note: users are expected to add "Hysteria-UDPGW" to their proxy-groups or rules.
+
+            // Route UDP traffic via UDPGW automatically.
+            // Keep TCP on existing policy (e.g. Proxy group/Hysteria-LB).
+            if (!UDP_NETWORK_RULE_REGEX.containsMatchIn(patchedYaml)) {
+                patchedYaml = if (RULES_HEADER_REGEX.containsMatchIn(patchedYaml)) {
+                    patchedYaml.replaceFirst(RULES_HEADER_REGEX, "rules:\n  - NETWORK,UDP,Hysteria-UDPGW\n")
+                } else {
+                    "$patchedYaml\n\nrules:\n  - NETWORK,UDP,Hysteria-UDPGW\n"
+                }
+            }
+        } else {
+            // Disable forced UDPGW routing when toggle is off.
+            patchedYaml = patchedYaml.replace(UDP_NETWORK_RULE_REGEX, "")
         }
 
         return patchedYaml
@@ -444,6 +455,8 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
         private val PORT_RANGE_REGEX = Regex("""^(\d{1,5})(?:-(\d{1,5}))?$""")
         private val PORT_LINE_REGEX = Regex("""(?m)^(\s*port:\s*)\d+\s*$""")
         private val PROXIES_HEADER_REGEX = Regex("""(?m)^proxies:\s*$""")
+        private val RULES_HEADER_REGEX = Regex("""(?m)^rules:\s*$""")
+        private val UDP_NETWORK_RULE_REGEX = Regex("""(?m)^\s*-\s*NETWORK\s*,\s*UDP\s*,\s*Hysteria-UDPGW\s*$""")
         private val HYSTERIA_LB_REGEX = Regex("""(?m)^\s*-\s*name:\s*["']?Hysteria-LB["']?\s*$""")
     }
 }

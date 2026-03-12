@@ -59,6 +59,9 @@ func (c *PacketConn) conIDForAddr(addr *net.UDPAddr) uint16 {
 }
 
 func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	udpAddr, ok := addr.(*net.UDPAddr)
 	if !ok {
 		return 0, errors.New("udpgw: invalid address type")
@@ -113,9 +116,6 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 
 	// Payload
 	copy(buf[offset:], p)
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	_, err = c.conn.Write(buf)
 	if err != nil {
