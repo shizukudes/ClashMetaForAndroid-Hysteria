@@ -60,7 +60,7 @@ func Start(fd int, stack, gateway, portal, dns string) (io.Closer, error) {
 		AutoDetectInterface: false, // implements by VpnService::protect
 		Inet4Address:        prefix4,
 		Inet6Address:        prefix6,
-		MTU:                 9000, // private const val TUN_MTU = 9000 in TunService.kt
+		MTU:                 1500, // private const val TUN_MTU = 1500 in TunService.kt
 		FileDescriptor:      fd,
 	}
 
