@@ -27,7 +27,7 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
 
     override suspend fun main() {
         val sStore = ServiceStore(this)
-        val activeUuid = intent.uuid ?: sStore.activeProfile ?: return finish()
+        val activeUuid = resolveTargetProfileUuid(sStore) ?: return finish()
 
         if (sStore.activeProfile != activeUuid) {
             sStore.activeProfile = activeUuid
@@ -156,6 +156,16 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
             }
         } finally {
             popDesign()
+        }
+    }
+
+
+    private suspend fun resolveTargetProfileUuid(store: ServiceStore): UUID? {
+        intent.uuid?.let { return it }
+        store.activeProfile?.let { return it }
+
+        return withContext(Dispatchers.IO) {
+            Database.database.openImportedDao().queryAllUUIDs().firstOrNull()
         }
     }
 
