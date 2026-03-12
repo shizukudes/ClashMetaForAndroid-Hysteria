@@ -46,7 +46,7 @@ func (u *UdpGw) ListenPacketContext(ctx context.Context, metadata *C.Metadata) (
 
 func NewUdpGw(option UdpGwOption) (*UdpGw, error) {
 	addr := net.JoinHostPort(option.Server, strconv.Itoa(option.Port))
-	return &UdpGw{
+	outbound := &UdpGw{
 		Base: &Base{
 			name:   option.Name,
 			addr:   addr,
@@ -54,8 +54,9 @@ func NewUdpGw(option UdpGwOption) (*UdpGw, error) {
 			udp:    true,
 			tfo:    false,
 			rmark:  option.RoutingMark,
-			dialer: option.DialerForAPI,
 		},
 		option: &option,
-	}, nil
+	}
+	outbound.dialer = option.NewDialer(outbound.DialOptions())
+	return outbound, nil
 }
