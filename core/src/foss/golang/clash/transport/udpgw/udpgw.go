@@ -1,6 +1,7 @@
 package udpgw
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -19,15 +20,51 @@ const (
 
 // PacketConn wraps a TCP connection to a badvpn-udpgw server and implements net.PacketConn.
 type PacketConn struct {
-	conn  net.Conn
-	mu    sync.Mutex
-	conid uint16
+	conn      net.Conn
+	mu        sync.Mutex
+	conid     uint16
+	firstSend bool
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 func NewPacketConn(conn net.Conn) *PacketConn {
-	return &PacketConn{
-		conn:  conn,
-		conid: uint16(rand.Intn(65535-1) + 1), // Generate random conid 1-65535
+	ctx, cancel := context.WithCancel(context.Background())
+	pc := &PacketConn{
+		conn:      conn,
+		conid:     uint16(rand.Intn(65535-1) + 1),
+		firstSend: true,
+		ctx:       ctx,
+		cancel:    cancel,
+	}
+
+	// Start keepalive routine (badvpn udpgw requires this to prevent timeout)
+	go pc.keepaliveLoop()
+
+	return pc
+}
+
+func (c *PacketConn) keepaliveLoop() {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		case <-ticker.C:
+			// Send keepalive packet
+			c.mu.Lock()
+			// length(2) + flags(1) + conid(2) = 5 bytes total. payload is 0
+			// the inner packetproto length is just the udpgw_header size (3)
+			buf := make([]byte, 5)
+			binary.LittleEndian.PutUint16(buf[0:2], 3)
+			buf[2] = FlagKeepalive
+			binary.LittleEndian.PutUint16(buf[3:5], 0) // keepalive usually uses conid 0 or current conid
+
+			c.conn.Write(buf)
+			c.mu.Unlock()
+		}
 	}
 }
 
@@ -48,11 +85,18 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	if isIPv6 {
 		flags |= FlagIPv6
 	}
-	
+
 	// Set DNS flag if destination port is 53
 	if udpAddr.Port == 53 {
 		flags |= FlagDNS
 	}
+
+	c.mu.Lock()
+	if c.firstSend {
+		flags |= FlagRebind
+		c.firstSend = false
+	}
+	c.mu.Unlock()
 
 	// Calculate header length: flags(1) + conid(2) + ip + port(2)
 	headerLen := 1 + 2 + len(ip) + 2
@@ -115,6 +159,11 @@ func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	}
 
 	flags := buf[0]
+	// Ignore Keepalive replies
+	if (flags & FlagKeepalive) != 0 {
+		return 0, nil, nil // return empty packet so caller can retry reading
+	}
+
 	isIPv6 := (flags & FlagIPv6) != 0
 
 	offset := 3 // Skip flags and conid
@@ -151,8 +200,8 @@ func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	return payloadLen, udpAddr, nil
 }
 
-
 func (c *PacketConn) Close() error {
+	c.cancel()
 	return c.conn.Close()
 }
 
