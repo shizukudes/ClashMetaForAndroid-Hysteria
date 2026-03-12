@@ -27,7 +27,8 @@ import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import java.io.OutputStreamWriter
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.suspendCancellableCoroutine
 import com.github.kr328.clash.design.R
 
 class LogcatActivity : BaseActivity<LogcatDesign>() {
@@ -138,10 +139,11 @@ class LogcatActivity : BaseActivity<LogcatDesign>() {
     }
 
     private suspend fun bindLogcatService(): LogcatService {
-        return suspendCoroutine { ctx ->
-            bindService(LogcatService::class.intent, object : ServiceConnection {
+        return suspendCancellableCoroutine { ctx ->
+            val connection = object : ServiceConnection {
                 override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                    val srv = service!!.queryLocalInterface("") as LogcatService
+                    val srv = service?.queryLocalInterface("") as? LogcatService
+                        ?: return ctx.resumeWithException(IllegalStateException("Invalid LogcatService binder"))
 
                     ctx.resume(srv)
 
@@ -150,8 +152,25 @@ class LogcatActivity : BaseActivity<LogcatDesign>() {
 
                 override fun onServiceDisconnected(name: ComponentName?) {
                     conn = null
+
+                    if (ctx.isActive) {
+                        ctx.resumeWithException(IllegalStateException("LogcatService disconnected"))
+                    }
                 }
-            }, Context.BIND_AUTO_CREATE)
+            }
+
+            val bound = bindService(LogcatService::class.intent, connection, Context.BIND_AUTO_CREATE)
+
+            if (!bound) {
+                ctx.resumeWithException(IllegalStateException("Unable to bind LogcatService"))
+                return@suspendCancellableCoroutine
+            }
+
+            ctx.invokeOnCancellation {
+                runCatching {
+                    unbindService(connection)
+                }
+            }
         }
     }
 

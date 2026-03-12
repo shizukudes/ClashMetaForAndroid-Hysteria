@@ -22,4 +22,5 @@ data class HysteriaConfig(
     var logLevel: String = "info",
     var yamlTemplate: String = "",
     var accounts: List<HysteriaAccount> = emptyList(),
+    var activeAccountId: String? = null,
 )
