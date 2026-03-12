@@ -31,6 +31,9 @@ type PacketConn struct {
 }
 
 func NewPacketConn(conn net.Conn) *PacketConn {
+	if conn == nil {
+		return nil
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	pc := &PacketConn{
 		conn:      conn,
@@ -46,6 +49,12 @@ func NewPacketConn(conn net.Conn) *PacketConn {
 }
 
 func (c *PacketConn) keepaliveLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Debugln("[UDPGW] keepaliveLoop panic: %v", r)
+		}
+	}()
+
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
@@ -55,20 +64,37 @@ func (c *PacketConn) keepaliveLoop() {
 			return
 		case <-ticker.C:
 			c.mu.Lock()
-			buf := make([]byte, 5)
-			binary.LittleEndian.PutUint16(buf[0:2], 3)
-			buf[2] = FlagKeepalive
-			binary.LittleEndian.PutUint16(buf[3:5], 0)
-			c.conn.Write(buf)
+			if c.conn != nil {
+				buf := make([]byte, 5)
+				binary.LittleEndian.PutUint16(buf[0:2], 3)
+				buf[2] = FlagKeepalive
+				binary.LittleEndian.PutUint16(buf[3:5], 0)
+				c.conn.Write(buf)
+			}
 			c.mu.Unlock()
 		}
 	}
 }
 
 func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Debugln("[UDPGW] WriteTo panic: %v", r)
+			err = errors.New("udpgw panic")
+		}
+	}()
+
+	if c == nil || c.conn == nil {
+		return 0, errors.New("udpgw: connection closed")
+	}
+
 	udpAddr, ok := addr.(*net.UDPAddr)
-	if !ok {
+	if !ok || udpAddr == nil {
 		return 0, errors.New("udpgw: invalid address type")
+	}
+
+	if udpAddr.IP == nil {
+		return 0, errors.New("udpgw: nil IP address")
 	}
 
 	ip := udpAddr.IP.To4()
@@ -76,6 +102,10 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	if ip == nil {
 		ip = udpAddr.IP.To16()
 		isIPv6 = true
+	}
+
+	if ip == nil {
+		return 0, errors.New("udpgw: unable to parse IP")
 	}
 
 	flags := uint8(0)
@@ -132,6 +162,17 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 }
 
 func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Debugln("[UDPGW] ReadFrom panic: %v", r)
+			err = errors.New("udpgw panic")
+		}
+	}()
+
+	if c == nil || c.conn == nil {
+		return 0, nil, errors.New("udpgw: connection closed")
+	}
+
 	for {
 		lenBuf := make([]byte, 2)
 		if _, err := io.ReadFull(c.conn, lenBuf); err != nil {
@@ -192,22 +233,39 @@ func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 }
 
 func (c *PacketConn) Close() error {
-	c.cancel()
-	return c.conn.Close()
+	if c != nil && c.cancel != nil {
+		c.cancel()
+	}
+	if c != nil && c.conn != nil {
+		return c.conn.Close()
+	}
+	return nil
 }
 
 func (c *PacketConn) LocalAddr() net.Addr {
+	if c == nil || c.conn == nil {
+		return nil
+	}
 	return c.conn.LocalAddr()
 }
 
 func (c *PacketConn) SetDeadline(t time.Time) error {
+	if c == nil || c.conn == nil {
+		return errors.New("closed")
+	}
 	return c.conn.SetDeadline(t)
 }
 
 func (c *PacketConn) SetReadDeadline(t time.Time) error {
+	if c == nil || c.conn == nil {
+		return errors.New("closed")
+	}
 	return c.conn.SetReadDeadline(t)
 }
 
 func (c *PacketConn) SetWriteDeadline(t time.Time) error {
+	if c == nil || c.conn == nil {
+		return errors.New("closed")
+	}
 	return c.conn.SetWriteDeadline(t)
 }
