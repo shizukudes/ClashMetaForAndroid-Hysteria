@@ -152,30 +152,34 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             else -> "info"
         }
 
-        enabledAccounts.forEachIndexed { index, account ->
-            val port = 2081 + index
+        var currentPort = 2081
+        enabledAccounts.forEach { account ->
+            // Spawn 3 instances per account for better load balancing
+            repeat(3) { i ->
+                val port = currentPort++
 
-            val hyConfig = JSONObject().apply {
-                put("server", "${account.serverIp}:${account.serverPortRange}")
-                put("obfs", account.obfs)
-                put("auth", account.password)
-                put("loglevel", hyLogLevel)
-                put("socks5", JSONObject().put("listen", "127.0.0.1:$port"))
-                put("insecure", true)
-                put("recvwindowconn", config.recvWindowConn)
-                put("recvwindow", config.recvWindow)
+                val hyConfig = JSONObject().apply {
+                    put("server", "${account.serverIp}:${account.serverPortRange}")
+                    put("obfs", account.obfs)
+                    put("auth", account.password)
+                    put("loglevel", hyLogLevel)
+                    put("socks5", JSONObject().put("listen", "127.0.0.1:$port"))
+                    put("insecure", true)
+                    put("recvwindowconn", config.recvWindowConn)
+                    put("recvwindow", config.recvWindow)
+                }
+
+                val hyCmd = arrayListOf(libUz, "-s", account.obfs, "--config", hyConfig.toString())
+                val hyPb = ProcessBuilder(hyCmd)
+                hyPb.directory(filesDir)
+                hyPb.environment()["LD_LIBRARY_PATH"] = libDir
+                hyPb.redirectErrorStream(true)
+
+                Log.i("HysteriaModule: Starting Hysteria instance ${i + 1} [${account.name}] on port $port")
+                val process = hyPb.start()
+                processes.add(process)
+                tunnelTargets.add("127.0.0.1:$port")
             }
-
-            val hyCmd = arrayListOf(libUz, "-s", account.obfs, "--config", hyConfig.toString())
-            val hyPb = ProcessBuilder(hyCmd)
-            hyPb.directory(filesDir)
-            hyPb.environment()["LD_LIBRARY_PATH"] = libDir
-            hyPb.redirectErrorStream(true)
-
-            Log.i("HysteriaModule: Starting Hysteria [${account.name}] on port $port")
-            val process = hyPb.start()
-            processes.add(process)
-            tunnelTargets.add("127.0.0.1:$port")
         }
 
         if (tunnelTargets.isEmpty()) return

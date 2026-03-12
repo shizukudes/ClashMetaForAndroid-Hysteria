@@ -288,6 +288,7 @@ inline static char *stpcpy (char *dest, const char *src)
 #endif
 
 #if !defined(HAVE_MEMPCPY)
+#if !defined(HAVE_MEMPCPY)
 inline static void *mempcpy(void *dest, const void *src, size_t len)
   __attribute__((always_inline));
 inline static void *mempcpy(void *dest, const void *src, size_t len)
@@ -296,7 +297,6 @@ inline static void *mempcpy(void *dest, const void *src, size_t len)
   return ((char *)dest)+len;
 }
 #endif
-
 #if 0
 int getline(char **lineptr, size_t *n, FILE *stream);
 #endif
