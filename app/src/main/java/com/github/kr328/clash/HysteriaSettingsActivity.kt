@@ -9,8 +9,10 @@ import com.github.kr328.clash.design.util.showExceptionToast
 import com.github.kr328.clash.service.data.Database
 import com.github.kr328.clash.service.model.HysteriaAccount
 import com.github.kr328.clash.service.model.HysteriaConfig
+import com.github.kr328.clash.service.model.Profile
 import com.github.kr328.clash.service.store.ServiceStore
 import com.github.kr328.clash.service.util.importedDir
+import com.github.kr328.clash.util.withProfile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.selects.select
@@ -158,15 +160,23 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
             popDesign()
         }
     }
-
-
     private suspend fun resolveTargetProfileUuid(store: ServiceStore): UUID? {
         intent.uuid?.let { return it }
         store.activeProfile?.let { return it }
 
-        return withContext(Dispatchers.IO) {
-            Database.database.openImportedDao().queryAllUUIDs().firstOrNull()
-        }
+        return runCatching {
+            withProfile {
+                val current = queryActive() ?: queryAll().firstOrNull()
+
+                if (current != null) {
+                    return@withProfile current.uuid
+                }
+
+                val created = create(Profile.Type.File, "Hysteria Profile")
+                queryByUUID(created)?.let { setActive(it) }
+                created
+            }
+        }.getOrNull()
     }
 
     private suspend fun saveAndGenerate(uuid: UUID, config: HysteriaConfig) {
