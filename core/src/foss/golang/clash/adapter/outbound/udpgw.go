@@ -41,7 +41,7 @@ func (u *UdpGw) ListenPacketContext(ctx context.Context, metadata *C.Metadata) (
 	}
 
 	pc := udpgw.NewPacketConn(c)
-	return NewPacketConn(pc, u), nil
+	return newPacketConn(pc, u), nil
 }
 
 func NewUdpGw(option UdpGwOption) (*UdpGw, error) {
