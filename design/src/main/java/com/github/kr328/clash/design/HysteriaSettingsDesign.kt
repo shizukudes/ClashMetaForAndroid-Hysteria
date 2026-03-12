@@ -8,8 +8,8 @@ import com.github.kr328.clash.design.util.applyFrom
 import com.github.kr328.clash.design.util.bindAppBarElevation
 import com.github.kr328.clash.design.util.layoutInflater
 import com.github.kr328.clash.design.util.root
-import com.github.kr328.clash.service.model.HysteriaConfig
 import com.github.kr328.clash.service.model.HysteriaAccount
+import com.github.kr328.clash.service.model.HysteriaConfig
 
 class HysteriaSettingsDesign(
     context: Context,
@@ -58,7 +58,8 @@ class HysteriaSettingsDesign(
                     icon = R.drawable.ic_baseline_dns,
                 ) {
                     title = account.name
-                    summary = "${if (account.enabled) "ON" else "OFF"} • ${account.serverIp}:${account.serverPortRange}"
+                    val activePrefix = if (config.activeAccountId == account.id) "ACTIVE • " else ""
+                    summary = "$activePrefix${if (account.enabled) "ON" else "OFF"} • ${account.serverIp}:${account.serverPortRange}"
 
                     clicked {
                         requests.trySend(Request.EditAccount(account))
@@ -110,7 +111,7 @@ class HysteriaSettingsDesign(
                 icon = R.drawable.ic_baseline_edit,
             ) {
                 summary = context.getString(R.string.edit_template_summary)
-                
+
                 clicked {
                     requests.trySend(Request.EditTemplate)
                 }
@@ -123,7 +124,7 @@ class HysteriaSettingsDesign(
                 icon = R.drawable.ic_baseline_save,
             ) {
                 summary = context.getString(R.string.generate_config_summary)
-                
+
                 clicked {
                     requests.trySend(Request.SaveAndGenerate)
                 }
