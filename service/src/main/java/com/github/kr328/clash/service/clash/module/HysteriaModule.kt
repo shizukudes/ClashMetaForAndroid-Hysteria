@@ -149,16 +149,13 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             }
         }
 
-        val alivePids = snapshot.mapNotNull { process ->
-            val pid = runCatching { process.pid() }.getOrNull() ?: return@mapNotNull null
-            if (process.isAlive) pid else null
-        }
+        val hasAliveProcesses = snapshot.any { it.isAlive }
 
-        if (alivePids.isNotEmpty()) {
-            val killCommand = "kill -9 " + alivePids.joinToString(" ")
+        if (hasAliveProcesses) {
+            val killCommand = "pkill -9 libuz; pkill -9 libload; pkill -f libuz.so; pkill -f libload.so"
             runCatching {
                 Runtime.getRuntime().exec(arrayOf("sh", "-c", killCommand)).waitFor(1, TimeUnit.SECONDS)
-                Log.w("HysteriaModule: Fallback force-kill for pids=$alivePids")
+                Log.w("HysteriaModule: Fallback force-kill with pkill")
             }.onFailure {
                 Log.w("HysteriaModule: Fallback force-kill failed: ${it.message}")
             }
