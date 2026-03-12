@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -18,13 +19,15 @@ const (
 
 // PacketConn wraps a TCP connection to a badvpn-udpgw server and implements net.PacketConn.
 type PacketConn struct {
-	conn net.Conn
-	mu   sync.Mutex
+	conn  net.Conn
+	mu    sync.Mutex
+	conid uint16
 }
 
 func NewPacketConn(conn net.Conn) *PacketConn {
 	return &PacketConn{
-		conn: conn,
+		conn:  conn,
+		conid: uint16(rand.Intn(65535-1) + 1), // Generate random conid 1-65535
 	}
 }
 
@@ -34,25 +37,25 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 		return 0, errors.New("udpgw: invalid address type")
 	}
 
-	ip := udpAddr.IP
-	isIPv6 := ip.To4() == nil
-	if !isIPv6 {
-		ip = ip.To4()
+	ip := udpAddr.IP.To4()
+	isIPv6 := false
+	if ip == nil {
+		ip = udpAddr.IP.To16()
+		isIPv6 = true
 	}
 
 	flags := uint8(0)
 	if isIPv6 {
 		flags |= FlagIPv6
 	}
-
-	// Calculate total length
-	headerLen := 1 + 2 // flags (1) + conid (2)
-	if isIPv6 {
-		headerLen += 16 + 2 // ipv6 (16) + port (2)
-	} else {
-		headerLen += 4 + 2 // ipv4 (4) + port (2)
+	
+	// Set DNS flag if destination port is 53
+	if udpAddr.Port == 53 {
+		flags |= FlagDNS
 	}
 
+	// Calculate header length: flags(1) + conid(2) + ip + port(2)
+	headerLen := 1 + 2 + len(ip) + 2
 	payloadLen := len(p)
 	totalLen := headerLen + payloadLen
 
@@ -62,20 +65,21 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 
 	buf := make([]byte, 2+totalLen)
 
-	// Length (16-bit little-endian)
-	binary.LittleEndian.PutUint16(buf[0:2], uint16(totalLen))
+	// Length prefix (Some udpgw use BigEndian for the stream frame length)
+	binary.BigEndian.PutUint16(buf[0:2], uint16(totalLen))
 
-	// Header: flags and conid (using 0 for simplicity per TCP connection)
+	// Header
 	buf[2] = flags
-	binary.LittleEndian.PutUint16(buf[3:5], 0) // conid = 0
+	// conid is LittleEndian in original badvpn
+	binary.LittleEndian.PutUint16(buf[3:5], c.conid)
 
 	// Address
 	offset := 5
 	copy(buf[offset:], ip)
 	offset += len(ip)
 
-	// Port (network byte order / big-endian)
-	binary.BigEndian.PutUint16(buf[offset:offset+2], uint16(udpAddr.Port))
+	// Port (BigEndian/Network Order)
+	binary.BigEndian.PutUint16(buf[offset:], uint16(udpAddr.Port))
 	offset += 2
 
 	// Payload
@@ -93,28 +97,27 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 }
 
 func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	// Read length (2 bytes, little-endian)
+	// Read length prefix
 	lenBuf := make([]byte, 2)
 	if _, err := io.ReadFull(c.conn, lenBuf); err != nil {
 		return 0, nil, err
 	}
-	totalLen := int(binary.LittleEndian.Uint16(lenBuf))
+	totalLen := int(binary.BigEndian.Uint16(lenBuf))
 
 	if totalLen < 3 {
 		return 0, nil, errors.New("udpgw: packet too short")
 	}
 
-	// Read the rest of the packet
+	// Read packet body
 	buf := make([]byte, totalLen)
 	if _, err := io.ReadFull(c.conn, buf); err != nil {
 		return 0, nil, err
 	}
 
 	flags := buf[0]
-	// conid := binary.LittleEndian.Uint16(buf[1:3]) // Ignored, we use 1 TCP conn per UDP session
 	isIPv6 := (flags & FlagIPv6) != 0
 
-	offset := 3
+	offset := 3 // Skip flags and conid
 	var ip net.IP
 	if isIPv6 {
 		if totalLen < offset+18 {
@@ -147,6 +150,7 @@ func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 
 	return payloadLen, udpAddr, nil
 }
+
 
 func (c *PacketConn) Close() error {
 	return c.conn.Close()
