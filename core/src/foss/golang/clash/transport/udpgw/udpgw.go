@@ -65,12 +65,12 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 
 	buf := make([]byte, 2+totalLen)
 
-	// Length prefix (Some udpgw use BigEndian for the stream frame length)
-	binary.BigEndian.PutUint16(buf[0:2], uint16(totalLen))
+	// Length prefix (MUST be LittleEndian according to badvpn packetproto)
+	binary.LittleEndian.PutUint16(buf[0:2], uint16(totalLen))
 
 	// Header
 	buf[2] = flags
-	// conid is LittleEndian in original badvpn
+	// conid MUST be LittleEndian
 	binary.LittleEndian.PutUint16(buf[3:5], c.conid)
 
 	// Address
@@ -102,7 +102,7 @@ func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	if _, err := io.ReadFull(c.conn, lenBuf); err != nil {
 		return 0, nil, err
 	}
-	totalLen := int(binary.BigEndian.Uint16(lenBuf))
+	totalLen := int(binary.LittleEndian.Uint16(lenBuf))
 
 	if totalLen < 3 {
 		return 0, nil, errors.New("udpgw: packet too short")
