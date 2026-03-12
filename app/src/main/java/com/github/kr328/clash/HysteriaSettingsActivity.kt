@@ -423,7 +423,15 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                 }
             }
             
-            // Note: users are expected to add "Hysteria-UDPGW" to their proxy-groups or rules.
+            // Inject UDP rules
+            val rulesHeaderRegex = Regex("""(?m)^rules:\s*$""")
+            if (rulesHeaderRegex.containsMatchIn(patchedYaml)) {
+                if (!patchedYaml.contains("MATCH,Hysteria-UDPGW,udp")) {
+                    patchedYaml = patchedYaml.replaceFirst(rulesHeaderRegex, "rules:\n  - MATCH,Hysteria-UDPGW,udp")
+                }
+            } else {
+                patchedYaml = "$patchedYaml\n\nrules:\n  - MATCH,Hysteria-UDPGW,udp\n  - MATCH,Proxy\n"
+            }
         }
 
         return patchedYaml
