@@ -76,6 +76,7 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                                 if (editAccount(newAccount)) {
                                     config.accounts = config.accounts + newAccount
                                     config.activeAccountId = newAccount.id
+                                    saveConfigOnly(activeUuid, config)
                                     design.update()
                                 }
                             }
@@ -83,18 +84,21 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                             is HysteriaSettingsDesign.Request.EditAccount -> {
                                 if (editAccount(request.account)) {
                                     config.activeAccountId = request.account.id
+                                    saveConfigOnly(activeUuid, config)
                                     design.update()
                                 } else {
                                     config.accounts = config.accounts.filter { it.id != request.account.id }
                                     if (config.activeAccountId == request.account.id) {
                                         config.activeAccountId = config.accounts.firstOrNull { it.enabled }?.id
                                     }
+                                    saveConfigOnly(activeUuid, config)
                                     design.update()
                                 }
                             }
 
                             HysteriaSettingsDesign.Request.EditTemplate -> {
                                 editTemplate(config)
+                                saveConfigOnly(activeUuid, config)
                             }
 
                             is HysteriaSettingsDesign.Request.DeleteAccount -> {
@@ -102,6 +106,7 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                                 if (config.activeAccountId == request.account.id) {
                                     config.activeAccountId = config.accounts.firstOrNull { it.enabled }?.id
                                 }
+                                saveConfigOnly(activeUuid, config)
                                 design.update()
                             }
                         }
@@ -110,6 +115,19 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                     }
                 }
             }
+        }
+    }
+
+    private suspend fun saveConfigOnly(uuid: UUID, config: HysteriaConfig) {
+        withContext(Dispatchers.IO) {
+            val importedProfile = withProfile { queryByUUID(uuid) }?.imported == true
+            val profileDir = if (importedProfile) {
+                importedDir.resolve(uuid.toString())
+            } else {
+                pendingDir.resolve(uuid.toString())
+            }
+            profileDir.mkdirs()
+            profileDir.resolve("hysteria.json").writeText(json.encodeToString(HysteriaConfig.serializer(), config))
         }
     }
 
