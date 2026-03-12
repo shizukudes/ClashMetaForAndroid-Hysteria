@@ -9,6 +9,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/metacubex/mihomo/log"
 )
 
 const (
@@ -38,7 +40,6 @@ func NewPacketConn(conn net.Conn) *PacketConn {
 		cancel:    cancel,
 	}
 
-	// Start keepalive routine (badvpn udpgw requires this to prevent timeout)
 	go pc.keepaliveLoop()
 
 	return pc
@@ -53,15 +54,11 @@ func (c *PacketConn) keepaliveLoop() {
 		case <-c.ctx.Done():
 			return
 		case <-ticker.C:
-			// Send keepalive packet
 			c.mu.Lock()
-			// length(2) + flags(1) + conid(2) = 5 bytes total. payload is 0
-			// the inner packetproto length is just the udpgw_header size (3)
 			buf := make([]byte, 5)
 			binary.LittleEndian.PutUint16(buf[0:2], 3)
 			buf[2] = FlagKeepalive
-			binary.LittleEndian.PutUint16(buf[3:5], 0) // keepalive usually uses conid 0 or current conid
-
+			binary.LittleEndian.PutUint16(buf[3:5], 0)
 			c.conn.Write(buf)
 			c.mu.Unlock()
 		}
@@ -86,7 +83,6 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 		flags |= FlagIPv6
 	}
 
-	// Set DNS flag if destination port is 53
 	if udpAddr.Port == 53 {
 		flags |= FlagDNS
 	}
@@ -98,7 +94,6 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	}
 	c.mu.Unlock()
 
-	// Calculate header length: flags(1) + conid(2) + ip + port(2)
 	headerLen := 1 + 2 + len(ip) + 2
 	payloadLen := len(p)
 	totalLen := headerLen + payloadLen
@@ -109,24 +104,18 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 
 	buf := make([]byte, 2+totalLen)
 
-	// Length prefix (MUST be LittleEndian according to badvpn packetproto)
 	binary.LittleEndian.PutUint16(buf[0:2], uint16(totalLen))
 
-	// Header
 	buf[2] = flags
-	// conid MUST be LittleEndian
 	binary.LittleEndian.PutUint16(buf[3:5], c.conid)
 
-	// Address
 	offset := 5
 	copy(buf[offset:], ip)
 	offset += len(ip)
 
-	// Port (BigEndian/Network Order)
 	binary.BigEndian.PutUint16(buf[offset:], uint16(udpAddr.Port))
 	offset += 2
 
-	// Payload
 	copy(buf[offset:], p)
 
 	c.mu.Lock()
@@ -134,15 +123,16 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 
 	_, err = c.conn.Write(buf)
 	if err != nil {
+		log.Debugln("[UDPGW] WriteTo failed: %v", err)
 		return 0, err
 	}
 
+	log.Debugln("[UDPGW] Sent %d bytes to %s via conid %d (flags: %d)", payloadLen, addr.String(), c.conid, flags)
 	return len(p), nil
 }
 
 func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	for {
-		// Read length prefix
 		lenBuf := make([]byte, 2)
 		if _, err := io.ReadFull(c.conn, lenBuf); err != nil {
 			return 0, nil, err
@@ -153,21 +143,19 @@ func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 			return 0, nil, errors.New("udpgw: packet too short")
 		}
 
-		// Read packet body
 		buf := make([]byte, totalLen)
 		if _, err := io.ReadFull(c.conn, buf); err != nil {
 			return 0, nil, err
 		}
 
 		flags := buf[0]
-		// Ignore Keepalive replies by continuing the loop
 		if (flags & FlagKeepalive) != 0 {
 			continue
 		}
 
 		isIPv6 := (flags & FlagIPv6) != 0
 
-		offset := 3 // Skip flags and conid
+		offset := 3
 		var ip net.IP
 		if isIPv6 {
 			if totalLen < offset+18 {
@@ -198,6 +186,7 @@ func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 			Port: int(port),
 		}
 
+		log.Debugln("[UDPGW] Received %d bytes from %s via conid %d", payloadLen, udpAddr.String(), binary.LittleEndian.Uint16(buf[1:3]))
 		return payloadLen, udpAddr, nil
 	}
 }
