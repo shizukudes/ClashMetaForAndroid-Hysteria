@@ -19,14 +19,14 @@ type rwConn struct {
 	w *bytes.Buffer
 }
 
-func (c *rwConn) Read(p []byte) (int, error)         { return c.r.Read(p) }
-func (c *rwConn) Write(p []byte) (int, error)        { return c.w.Write(p) }
-func (c *rwConn) Close() error                       { return nil }
-func (c *rwConn) LocalAddr() net.Addr                { return mockAddr("local") }
-func (c *rwConn) RemoteAddr() net.Addr               { return mockAddr("remote") }
-func (c *rwConn) SetDeadline(time.Time) error        { return nil }
-func (c *rwConn) SetReadDeadline(time.Time) error    { return nil }
-func (c *rwConn) SetWriteDeadline(time.Time) error   { return nil }
+func (c *rwConn) Read(p []byte) (int, error)       { return c.r.Read(p) }
+func (c *rwConn) Write(p []byte) (int, error)      { return c.w.Write(p) }
+func (c *rwConn) Close() error                     { return nil }
+func (c *rwConn) LocalAddr() net.Addr              { return mockAddr("local") }
+func (c *rwConn) RemoteAddr() net.Addr             { return mockAddr("remote") }
+func (c *rwConn) SetDeadline(time.Time) error      { return nil }
+func (c *rwConn) SetReadDeadline(time.Time) error  { return nil }
+func (c *rwConn) SetWriteDeadline(time.Time) error { return nil }
 
 func TestWriteToUsesLittleEndianPacketProtoAndBigEndianPort(t *testing.T) {
 	out := &bytes.Buffer{}
@@ -93,6 +93,25 @@ func TestWriteToUsesStableConIDPerRemote(t *testing.T) {
 	if ids[2] == ids[0] {
 		t.Fatalf("different remote should use different conid, got same %d", ids[2])
 	}
+
+	flagAt := func(frame []byte, idx int) uint8 {
+		p := 0
+		for i := 0; i < idx; i++ {
+			l := int(binary.LittleEndian.Uint16(frame[p : p+2]))
+			p += 2 + l
+		}
+		return frame[p+2]
+	}
+
+	if (flagAt(frame, 0) & FlagRebind) == 0 {
+		t.Fatalf("first packet for new remote must set REBIND")
+	}
+	if (flagAt(frame, 1) & FlagRebind) != 0 {
+		t.Fatalf("subsequent packet for same remote must not set REBIND")
+	}
+	if (flagAt(frame, 2) & FlagRebind) == 0 {
+		t.Fatalf("first packet for another new remote must set REBIND")
+	}
 }
 
 func TestReadFromParsesLittleEndianFrame(t *testing.T) {
@@ -122,5 +141,39 @@ func TestReadFromParsesLittleEndianFrame(t *testing.T) {
 	}
 	if !udpAddr.IP.Equal(net.IPv4(9, 9, 9, 9)) || udpAddr.Port != 3478 {
 		t.Fatalf("addr mismatch: %v", udpAddr)
+	}
+}
+
+func TestReadFromSkipsKeepaliveFrame(t *testing.T) {
+	payload := []byte{0xCA, 0xFE}
+
+	keepalive := make([]byte, 2+3)
+	binary.LittleEndian.PutUint16(keepalive[:2], 3)
+	keepalive[2] = FlagKeepalive
+	binary.LittleEndian.PutUint16(keepalive[3:5], 1)
+
+	dataLen := 1 + 2 + 4 + 2 + len(payload)
+	data := make([]byte, 2+dataLen)
+	binary.LittleEndian.PutUint16(data[:2], uint16(dataLen))
+	data[2] = 0
+	binary.LittleEndian.PutUint16(data[3:5], 1)
+	copy(data[5:9], []byte{7, 7, 7, 7})
+	binary.BigEndian.PutUint16(data[9:11], 443)
+	copy(data[11:], payload)
+
+	stream := append(keepalive, data...)
+	pc := NewPacketConn(&rwConn{r: bytes.NewReader(stream), w: &bytes.Buffer{}})
+
+	buf := make([]byte, 16)
+	n, addr, err := pc.ReadFrom(buf)
+	if err != nil {
+		t.Fatalf("ReadFrom failed: %v", err)
+	}
+	if !bytes.Equal(buf[:n], payload) {
+		t.Fatalf("payload mismatch got=%v want=%v", buf[:n], payload)
+	}
+	udpAddr, ok := addr.(*net.UDPAddr)
+	if !ok || udpAddr.Port != 443 {
+		t.Fatalf("invalid addr: %v", addr)
 	}
 }

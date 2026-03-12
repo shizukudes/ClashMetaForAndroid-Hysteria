@@ -54,7 +54,7 @@ func NewUdpGw(option UdpGwOption) (*UdpGw, error) {
 			udp:    true,
 			tfo:    false,
 			rmark:  option.RoutingMark,
-			dialer: option.DialerForAPI,
+			dialer: option.NewDialer(nil),
 		},
 		option: &option,
 	}, nil

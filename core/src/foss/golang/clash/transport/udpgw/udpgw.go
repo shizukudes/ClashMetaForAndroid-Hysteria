@@ -37,10 +37,10 @@ func NewPacketConn(conn net.Conn) *PacketConn {
 	}
 }
 
-func (c *PacketConn) conIDForAddr(addr *net.UDPAddr) uint16 {
+func (c *PacketConn) conIDForAddr(addr *net.UDPAddr) (uint16, bool) {
 	key := addr.String()
 	if conid, ok := c.addrConID[key]; ok {
-		return conid
+		return conid, false
 	}
 
 	for {
@@ -52,7 +52,7 @@ func (c *PacketConn) conIDForAddr(addr *net.UDPAddr) uint16 {
 			c.usedConID[conid] = struct{}{}
 			c.addrConID[key] = conid
 			c.nextConID++
-			return conid
+			return conid, true
 		}
 		c.nextConID++
 	}
@@ -84,7 +84,11 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 		flags |= FlagDNS
 	}
 
-	conid := c.conIDForAddr(udpAddr)
+	conid, isNewConID := c.conIDForAddr(udpAddr)
+	if isNewConID {
+		// badvpn udpgw client sends REBIND on first packet of a new mapping.
+		flags |= FlagRebind
+	}
 
 	// Calculate header length: flags(1) + conid(2) + ip + port(2)
 	headerLen := 1 + 2 + len(ip) + 2
@@ -126,58 +130,65 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 }
 
 func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	// Read length prefix
-	lenBuf := make([]byte, 2)
-	if _, err := io.ReadFull(c.conn, lenBuf); err != nil {
-		return 0, nil, err
-	}
-	totalLen := int(binary.LittleEndian.Uint16(lenBuf))
-
-	if totalLen < 3 {
-		return 0, nil, errors.New("udpgw: packet too short")
-	}
-
-	// Read packet body
-	buf := make([]byte, totalLen)
-	if _, err := io.ReadFull(c.conn, buf); err != nil {
-		return 0, nil, err
-	}
-
-	flags := buf[0]
-	isIPv6 := (flags & FlagIPv6) != 0
-
-	offset := 3 // Skip flags and conid
-	var ip net.IP
-	if isIPv6 {
-		if totalLen < offset+18 {
-			return 0, nil, errors.New("udpgw: packet too short for IPv6")
+	for {
+		// Read length prefix
+		lenBuf := make([]byte, 2)
+		if _, err := io.ReadFull(c.conn, lenBuf); err != nil {
+			return 0, nil, err
 		}
-		ip = net.IP(buf[offset : offset+16])
-		offset += 16
-	} else {
-		if totalLen < offset+6 {
-			return 0, nil, errors.New("udpgw: packet too short for IPv4")
+		totalLen := int(binary.LittleEndian.Uint16(lenBuf))
+
+		if totalLen < 3 {
+			return 0, nil, errors.New("udpgw: packet too short")
 		}
-		ip = net.IP(buf[offset : offset+4])
-		offset += 4
+
+		// Read packet body
+		buf := make([]byte, totalLen)
+		if _, err := io.ReadFull(c.conn, buf); err != nil {
+			return 0, nil, err
+		}
+
+		flags := buf[0]
+		if (flags & FlagKeepalive) != 0 {
+			// Keepalive frames carry no data for upper layer.
+			continue
+		}
+
+		isIPv6 := (flags & FlagIPv6) != 0
+
+		offset := 3 // Skip flags and conid
+		var ip net.IP
+		if isIPv6 {
+			if totalLen < offset+18 {
+				return 0, nil, errors.New("udpgw: packet too short for IPv6")
+			}
+			ip = net.IP(buf[offset : offset+16])
+			offset += 16
+		} else {
+			if totalLen < offset+6 {
+				return 0, nil, errors.New("udpgw: packet too short for IPv4")
+			}
+			ip = net.IP(buf[offset : offset+4])
+			offset += 4
+		}
+
+		port := binary.BigEndian.Uint16(buf[offset : offset+2])
+		offset += 2
+
+		payloadLen := totalLen - offset
+		if len(p) < payloadLen {
+			return 0, nil, io.ErrShortBuffer
+		}
+
+		copy(p, buf[offset:])
+
+		udpAddr := &net.UDPAddr{
+			IP:   ip,
+			Port: int(port),
+		}
+
+		return payloadLen, udpAddr, nil
 	}
-
-	port := binary.BigEndian.Uint16(buf[offset : offset+2])
-	offset += 2
-
-	payloadLen := totalLen - offset
-	if len(p) < payloadLen {
-		return 0, nil, io.ErrShortBuffer
-	}
-
-	copy(p, buf[offset:])
-
-	udpAddr := &net.UDPAddr{
-		IP:   ip,
-		Port: int(port),
-	}
-
-	return payloadLen, udpAddr, nil
 }
 
 func (c *PacketConn) Close() error {
