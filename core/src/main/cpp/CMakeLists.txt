@@ -32,7 +32,7 @@ message(STATUS "version info = ${GIT_VERSION}")
 # 去除空格
 string(REGEX REPLACE "[ ]+" "" GIT_VERSION "${GIT_VERSION}")
 
-# 保存变量到文件
+# 保存变量 do 文件
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/version.h.in ${CMAKE_CURRENT_SOURCE_DIR}/version.h @ONLY)
 
 project(clash-bridge C)
@@ -58,17 +58,22 @@ include_directories("${GO_SOURCE}")
 
 link_directories("${GO_OUTPUT_BASE}/${CMAKE_ANDROID_ARCH_ABI}")
 
-add_library(bridge SHARED main.c jni_helper.c bridge_helper.c)
-
-# --- badvpn tun2socks integration ---
+# --- badvpn tun2socks configuration ---
 set(BADVPN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/badvpn)
-include_directories(${BADVPN_DIR} ${BADVPN_DIR}/lwip/src/include/ipv4 ${BADVPN_DIR}/lwip/src/include/ipv6 ${BADVPN_DIR}/lwip/src/include ${BADVPN_DIR}/lwip/custom)
 
 add_definitions(
     -DBADVPN_THREADWORK_USE_PTHREAD -DBADVPN_LINUX -DBADVPN_BREACTOR_BADVPN -D_GNU_SOURCE
     -DBADVPN_USE_SELFPIPE -DBADVPN_USE_EPOLL
     -DBADVPN_LITTLE_ENDIAN -DBADVPN_THREAD_SAFE
     -DNDEBUG
+)
+
+include_directories(
+    ${BADVPN_DIR}
+    ${BADVPN_DIR}/lwip/src/include/ipv4
+    ${BADVPN_DIR}/lwip/src/include/ipv6
+    ${BADVPN_DIR}/lwip/src/include
+    ${BADVPN_DIR}/lwip/custom
 )
 
 set(TUN2SOCKS_SOURCES
@@ -131,10 +136,7 @@ set(TUN2SOCKS_SOURCES
     ${BADVPN_DIR}/flowextra/PacketPassInactivityMonitor.c
     ${BADVPN_DIR}/tun2socks/SocksUdpGwClient.c
     ${BADVPN_DIR}/udpgw_client/UdpGwClient.c
-    ${BADVPN_DIR}/custom/BTimer_unix.c
 )
 
-target_sources(bridge PRIVATE ${TUN2SOCKS_SOURCES})
-# --- end badvpn ---
-
+add_library(bridge SHARED main.c jni_helper.c bridge_helper.c ${TUN2SOCKS_SOURCES})
 target_link_libraries(bridge log clash)
