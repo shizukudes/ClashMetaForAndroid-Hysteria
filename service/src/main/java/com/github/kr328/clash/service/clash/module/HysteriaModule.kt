@@ -153,7 +153,7 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         }
 
         enabledAccounts.forEachIndexed { index, account ->
-            val port = 20080 + index
+            val port = 2081 + index
 
             val hyConfig = JSONObject().apply {
                 put("server", "${account.serverIp}:${account.serverPortRange}")

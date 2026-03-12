@@ -287,7 +287,7 @@ inline static char *stpcpy (char *dest, const char *src)
 }
 #endif
 
-#if 0
+#if !defined(HAVE_MEMPCPY)
 inline static void *mempcpy(void *dest, const void *src, size_t len)
   __attribute__((always_inline));
 inline static void *mempcpy(void *dest, const void *src, size_t len)
