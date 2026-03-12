@@ -143,3 +143,35 @@ set(TUN2SOCKS_SOURCES
 
 add_library(bridge SHARED main.c jni_helper.c bridge_helper.c ${TUN2SOCKS_SOURCES})
 target_link_libraries(bridge log clash)
+
+# --- pdnsd integration ---
+set(PDNSD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/pdnsd)
+include_directories(${PDNSD_DIR} ${PDNSD_DIR}/src)
+
+add_executable(pdnsd
+    ${PDNSD_DIR}/src/cache.c
+    ${PDNSD_DIR}/src/conf-parser.c
+    ${PDNSD_DIR}/src/conff.c
+    ${PDNSD_DIR}/src/consts.c
+    ${PDNSD_DIR}/src/debug.c
+    ${PDNSD_DIR}/src/dns.c
+    ${PDNSD_DIR}/src/dns_answer.c
+    ${PDNSD_DIR}/src/dns_query.c
+    ${PDNSD_DIR}/src/error.c
+    ${PDNSD_DIR}/src/hash.c
+    ${PDNSD_DIR}/src/helpers.c
+    ${PDNSD_DIR}/src/icmp.c
+    ${PDNSD_DIR}/src/list.c
+    ${PDNSD_DIR}/src/main.c
+    ${PDNSD_DIR}/src/netdev.c
+    ${PDNSD_DIR}/src/rr_types.c
+    ${PDNSD_DIR}/src/servers.c
+    ${PDNSD_DIR}/src/status.c
+    ${PDNSD_DIR}/src/thread.c
+)
+
+target_compile_definitions(pdnsd PRIVATE 
+    -D_GNU_SOURCE -DANDROID -DPDNSD_CONFIG_FILE="/data/local/tmp/pdnsd.conf"
+)
+target_link_libraries(pdnsd log)
+# --- end pdnsd ---

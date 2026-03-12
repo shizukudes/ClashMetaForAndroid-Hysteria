@@ -22,9 +22,58 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         var useTun2Socks: Boolean = false
         var socksPort: Int = 0
         var udpgwServer: String = ""
+        private var pdnsdProcess: Process? = null
 
         fun requestStop() {
             useTun2Socks = false
+            pdnsdProcess?.destroy()
+            pdnsdProcess = null
+        }
+    }
+
+    private fun startPdnsd(libDir: String, filesDir: File) {
+        val pdnsdBat = File(libDir, "libpdnsd.so") // Built as executable but named as .so by NDK
+        if (!pdnsdBat.exists()) {
+            Log.e("HysteriaModule: pdnsd binary not found in $libDir")
+            return
+        }
+
+        val confFile = File(filesDir, "pdnsd.conf")
+        val cacheFile = File(filesDir, "pdnsd.cache")
+        
+        if (!cacheFile.exists()) cacheFile.createNewFile()
+
+        val confContent = """
+            global {
+                perm_cache=1024;
+                cache_dir="${filesDir.absolutePath}";
+                server_ip=127.0.0.1;
+                server_port=10535;
+                query_method=tcp_only;
+                run_as="root";
+                status_ctl=on;
+            }
+            server {
+                label="clash";
+                ip=127.0.0.1;
+                port=1053;
+                timeout=4;
+                uptest=none;
+            }
+        """.trimIndent()
+        
+        confFile.writeText(confContent)
+
+        try {
+            pdnsdProcess?.destroy()
+            val cmd = listOf(pdnsdBat.absolutePath, "-c", confFile.absolutePath, "-g")
+            pdnsdProcess = ProcessBuilder(cmd)
+                .directory(filesDir)
+                .redirectErrorStream(true)
+                .start()
+            Log.i("HysteriaModule: pdnsd started on port 10535")
+        } catch (e: Exception) {
+            Log.e("HysteriaModule: Failed to start pdnsd: ${e.message}")
         }
     }
 
@@ -60,6 +109,9 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             socksPort = 20080
             udpgwServer = runtimeAccounts[0].udpgwServer
             Log.i("HysteriaModule: Tun2Socks Core enabled (SOCKS 127.0.0.1:$socksPort, UDPGW: $udpgwServer)")
+            
+            val libDir = service.applicationInfo.nativeLibraryDir
+            startPdnsd(libDir, service.filesDir)
         }
 
         try {
