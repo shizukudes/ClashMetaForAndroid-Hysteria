@@ -171,7 +171,7 @@ add_executable(pdnsd
 )
 
 target_compile_definitions(pdnsd PRIVATE 
-    -D_GNU_SOURCE -DANDROID -DPDNSD_CONFIG_FILE="/data/local/tmp/pdnsd.conf"
+    _GNU_SOURCE __ANDROID__ PDNSD_CONFIG_FILE="/data/local/tmp/pdnsd.conf"
 )
 target_link_libraries(pdnsd log)
 # --- end pdnsd ---
