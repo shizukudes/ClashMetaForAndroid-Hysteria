@@ -66,8 +66,8 @@ class TunModule(private val vpn: VpnService) : Module<Unit>(vpn) {
         )
     }
 
-    fun attachTun2Socks(fd: Int, mtu: Int, socksServer: String, udpgwServer: String) {
-        Clash.startTun2Socks(fd, mtu, socksServer, udpgwServer)
+    fun attachTun2Socks(fd: Int, mtu: Int, socksServer: String, udpgwServer: String, dnsServer: String) {
+        Clash.startTun2Socks(fd, mtu, socksServer, udpgwServer, dnsServer)
     }
 
     suspend fun close() {

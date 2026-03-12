@@ -343,6 +343,7 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
               enable: true
               ipv6: false
               enhanced-mode: fake-ip
+              listen: 127.0.0.1:1053
               fake-ip-range: 198.18.0.1/16
               default-nameserver:
                 - 1.1.1.1

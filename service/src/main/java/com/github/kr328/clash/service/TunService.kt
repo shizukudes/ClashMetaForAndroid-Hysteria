@@ -229,7 +229,8 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
         if (HysteriaModule.useTun2Socks) {
             val socks = "127.0.0.1:${HysteriaModule.socksPort}"
             val udpgw = HysteriaModule.udpgwServer
-            attachTun2Socks(device.fd, TUN_MTU, socks, udpgw)
+            val dns = "127.0.0.1:1053"
+            attachTun2Socks(device.fd, TUN_MTU, socks, udpgw, dns)
         } else {
             attach(device)
         }

@@ -136,11 +136,13 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun2Socks(JNIEnv *env,
                                                                     jint fd,
                                                                     jint mtu,
                                                                     jstring socksServer,
-                                                                    jstring udpgwServer) {
+                                                                    jstring udpgwServer,
+                                                                    jstring dnsServer) {
     TRACE_METHOD();
 
     const char *socks = (*env)->GetStringUTFChars(env, socksServer, 0);
     const char *udpgw = (*env)->GetStringUTFChars(env, udpgwServer, 0);
+    const char *dns = (*env)->GetStringUTFChars(env, dnsServer, 0);
 
     char fd_str[32];
     sprintf(fd_str, "%d", fd);
@@ -153,7 +155,7 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun2Socks(JNIEnv *env,
         "--netif-netmask", "255.255.255.252",
         "--socks-server-addr", (char *)socks,
         "--udpgw-remote-server-addr", (char *)udpgw,
-        "--udpgw-transparent-dns",
+        "--dnsgw", (char *)dns,
         "--tunfd", fd_str,
         "--tunmtu", mtu_str,
         "--loglevel", "3",
@@ -164,6 +166,7 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun2Socks(JNIEnv *env,
 
     (*env)->ReleaseStringUTFChars(env, socksServer, socks);
     (*env)->ReleaseStringUTFChars(env, udpgwServer, udpgw);
+    (*env)->ReleaseStringUTFChars(env, dnsServer, dns);
 }
 
 JNIEXPORT void JNICALL
