@@ -110,8 +110,8 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	copy(buf[offset:], ip)
 	offset += len(ip)
 
-	// UDPGW protocol fields are little-endian.
-	binary.LittleEndian.PutUint16(buf[offset:], uint16(udpAddr.Port))
+	// Address port is in network byte order, following struct udpgw_addr_{ipv4,ipv6}.
+	binary.BigEndian.PutUint16(buf[offset:], uint16(udpAddr.Port))
 	offset += 2
 
 	// Payload
@@ -162,7 +162,7 @@ func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 		offset += 4
 	}
 
-	port := binary.LittleEndian.Uint16(buf[offset : offset+2])
+	port := binary.BigEndian.Uint16(buf[offset : offset+2])
 	offset += 2
 
 	payloadLen := totalLen - offset

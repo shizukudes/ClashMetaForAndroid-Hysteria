@@ -28,7 +28,7 @@ func (c *rwConn) SetDeadline(time.Time) error        { return nil }
 func (c *rwConn) SetReadDeadline(time.Time) error    { return nil }
 func (c *rwConn) SetWriteDeadline(time.Time) error   { return nil }
 
-func TestWriteToUsesLittleEndianPacketProtoAndPort(t *testing.T) {
+func TestWriteToUsesLittleEndianPacketProtoAndBigEndianPort(t *testing.T) {
 	out := &bytes.Buffer{}
 	pc := NewPacketConn(&rwConn{r: bytes.NewReader(nil), w: out})
 
@@ -49,7 +49,7 @@ func TestWriteToUsesLittleEndianPacketProtoAndPort(t *testing.T) {
 	}
 
 	portOff := 2 + 1 + 2 + 4
-	gotPort := binary.LittleEndian.Uint16(frame[portOff : portOff+2])
+	gotPort := binary.BigEndian.Uint16(frame[portOff : portOff+2])
 	if gotPort != uint16(addr.Port) {
 		t.Fatalf("port encoded with wrong endianness: got %d want %d", gotPort, addr.Port)
 	}
@@ -103,7 +103,7 @@ func TestReadFromParsesLittleEndianFrame(t *testing.T) {
 	frame[2] = 0 // flags
 	binary.LittleEndian.PutUint16(frame[3:5], 99)
 	copy(frame[5:9], []byte{9, 9, 9, 9})
-	binary.LittleEndian.PutUint16(frame[9:11], 3478)
+	binary.BigEndian.PutUint16(frame[9:11], 3478)
 	copy(frame[11:], payload)
 
 	pc := NewPacketConn(&rwConn{r: bytes.NewReader(frame), w: &bytes.Buffer{}})
