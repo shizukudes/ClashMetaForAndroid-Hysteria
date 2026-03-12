@@ -12,9 +12,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
       
-      - name: Checkout and Update submodules
-        run: git submodule update --init --recursive --remote --force
-
       - name: Setup Java
         uses: actions/setup-java@v4
         with:

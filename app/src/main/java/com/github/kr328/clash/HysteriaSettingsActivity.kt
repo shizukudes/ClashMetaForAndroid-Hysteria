@@ -200,7 +200,7 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
             }
 
             val activeAccount = resolveActiveAccount(config)
-            val generatedYaml = upsertHysteriaProxy(template, config.localPort)
+            val generatedYaml = upsertHysteriaProxy(template, config)
             val yaml = injectHysteriaMeta(generatedYaml, activeAccount)
 
             if (HYSTERIA_LB_REGEX.containsMatchIn(yaml) && activeAccount != null) {
@@ -351,30 +351,64 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
         """.trimIndent()
     }
 
-    private fun upsertHysteriaProxy(yaml: String, localPort: Int): String {
+    private fun upsertHysteriaProxy(yaml: String, config: HysteriaConfig): String {
+        var patchedYaml = yaml
+        val localPort = config.localPort
+        
         val nameRegex = Regex("""(?m)^\s*-\s*name:\s*["']?Hysteria-LB["']?\s*$""")
-        val blockStart = nameRegex.find(yaml)
+        val blockStart = nameRegex.find(patchedYaml)
 
         if (blockStart != null) {
             val nextName = Regex("""(?m)^\s*-\s*name:\s*""")
-                .find(yaml, blockStart.range.last + 1)
-            val blockEndExclusive = nextName?.range?.first ?: yaml.length
-            val block = yaml.substring(blockStart.range.first, blockEndExclusive)
+                .find(patchedYaml, blockStart.range.last + 1)
+            val blockEndExclusive = nextName?.range?.first ?: patchedYaml.length
+            val block = patchedYaml.substring(blockStart.range.first, blockEndExclusive)
             val patchedBlock = if (PORT_LINE_REGEX.containsMatchIn(block)) {
                 block.replaceFirst(PORT_LINE_REGEX, "$1$localPort")
             } else {
                 "$block\n    port: $localPort"
             }
 
-            return yaml.substring(0, blockStart.range.first) + patchedBlock + yaml.substring(blockEndExclusive)
+            patchedYaml = patchedYaml.substring(0, blockStart.range.first) + patchedBlock + patchedYaml.substring(blockEndExclusive)
+        } else {
+            val proxyEntry = "  - name: \"Hysteria-LB\"\n    type: socks5\n    server: 127.0.0.1\n    port: $localPort"
+            patchedYaml = if (PROXIES_HEADER_REGEX.containsMatchIn(patchedYaml)) {
+                patchedYaml.replaceFirst(PROXIES_HEADER_REGEX, "proxies:\n$proxyEntry")
+            } else {
+                "$patchedYaml\n\nproxies:\n$proxyEntry\n"
+            }
+        }
+        
+        // Add UDPGW
+        if (config.udpForwarding) {
+            val udpgwRegex = Regex("""(?m)^\s*-\s*name:\s*["']?Hysteria-UDPGW["']?\s*$""")
+            val udpgwBlockStart = udpgwRegex.find(patchedYaml)
+            
+            if (udpgwBlockStart != null) {
+                val nextName = Regex("""(?m)^\s*-\s*name:\s*""")
+                    .find(patchedYaml, udpgwBlockStart.range.last + 1)
+                val blockEndExclusive = nextName?.range?.first ?: patchedYaml.length
+                val block = patchedYaml.substring(udpgwBlockStart.range.first, blockEndExclusive)
+                val patchedBlock = if (PORT_LINE_REGEX.containsMatchIn(block)) {
+                    block.replaceFirst(PORT_LINE_REGEX, "$1${config.udpgwPort}")
+                } else {
+                    "$block\n    port: ${config.udpgwPort}"
+                }
+    
+                patchedYaml = patchedYaml.substring(0, udpgwBlockStart.range.first) + patchedBlock + patchedYaml.substring(blockEndExclusive)
+            } else {
+                val udpgwEntry = "  - name: \"Hysteria-UDPGW\"\n    type: udpgw\n    server: 127.0.0.1\n    port: ${config.udpgwPort}"
+                patchedYaml = if (PROXIES_HEADER_REGEX.containsMatchIn(patchedYaml)) {
+                    patchedYaml.replaceFirst(PROXIES_HEADER_REGEX, "proxies:\n$udpgwEntry\n")
+                } else {
+                    "$patchedYaml\n\nproxies:\n$udpgwEntry\n"
+                }
+            }
+            
+            // Note: users are expected to add "Hysteria-UDPGW" to their proxy-groups or rules.
         }
 
-        val proxyEntry = "  - name: \"Hysteria-LB\"\n    type: socks5\n    server: 127.0.0.1\n    port: $localPort"
-        return if (PROXIES_HEADER_REGEX.containsMatchIn(yaml)) {
-            yaml.replaceFirst(PROXIES_HEADER_REGEX, "proxies:\n$proxyEntry")
-        } else {
-            "$yaml\n\nproxies:\n$proxyEntry\n"
-        }
+        return patchedYaml
     }
 
     private fun injectHysteriaMeta(yaml: String, activeAccount: HysteriaAccount?): String {

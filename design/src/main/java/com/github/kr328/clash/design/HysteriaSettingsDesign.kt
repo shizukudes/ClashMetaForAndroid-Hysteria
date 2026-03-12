@@ -85,6 +85,20 @@ class HysteriaSettingsDesign(
                 icon = R.drawable.ic_baseline_edit,
             )
 
+            switch(
+                value = config::udpForwarding,
+                icon = R.drawable.ic_baseline_dns,
+                title = R.string.udp_forwarding,
+                summary = R.string.udp_forwarding_summary,
+            )
+
+            editableText(
+                value = config::udpgwPort,
+                adapter = NullableTextAdapter.Int,
+                title = R.string.udpgw_port,
+                icon = R.drawable.ic_baseline_edit,
+            )
+
             editableText(
                 value = config::recvWindowConn,
                 adapter = NullableTextAdapter.Int,

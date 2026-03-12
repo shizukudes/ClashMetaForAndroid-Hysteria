@@ -21,6 +21,8 @@ data class HysteriaConfig(
     var recvWindow: Int = 327680,
     var logLevel: String = "info",
     var yamlTemplate: String = "",
+    var udpForwarding: Boolean = true,
+    var udpgwPort: Int = 7300,
     var accounts: List<HysteriaAccount> = emptyList(),
     var activeAccountId: String? = null,
 )

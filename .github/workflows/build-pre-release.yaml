@@ -20,9 +20,6 @@ jobs:
       - name: Fetch tags
         run: git fetch --tags --force
       
-      - name: Checkout submodules
-        run: git submodule update --init --recursive --force
-
       - name: Generate Keystore
         run: |
           rm -f release.keystore

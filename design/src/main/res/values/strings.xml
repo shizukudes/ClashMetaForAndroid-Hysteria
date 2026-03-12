@@ -383,4 +383,7 @@
     <string name="generate_config_summary">Create a Hysteria-optimized Clash profile</string>
     <string name="edit_template">Edit YAML Template</string>
     <string name="edit_template_summary">Custom Clash rules and settings for this profile</string>
+    <string name="udp_forwarding">UDP Forwarding (UDPGW)</string>
+    <string name="udp_forwarding_summary">Forward UDP traffic via badvpn-udpgw</string>
+    <string name="udpgw_port">UDPGW Port</string>
 </resources>
