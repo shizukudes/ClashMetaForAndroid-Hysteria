@@ -70,6 +70,7 @@ add_definitions(
 
 include_directories(
     ${BADVPN_DIR}
+    ${BADVPN_DIR}/libancillary
     ${BADVPN_DIR}/lwip/src/include/ipv4
     ${BADVPN_DIR}/lwip/src/include/ipv6
     ${BADVPN_DIR}/lwip/src/include
@@ -77,6 +78,8 @@ include_directories(
 )
 
 set(TUN2SOCKS_SOURCES
+    ${BADVPN_DIR}/libancillary/fd_recv.c
+    ${BADVPN_DIR}/libancillary/fd_send.c
     ${BADVPN_DIR}/base/BLog_syslog.c
     ${BADVPN_DIR}/system/BReactor_badvpn.c
     ${BADVPN_DIR}/system/BSignal.c
