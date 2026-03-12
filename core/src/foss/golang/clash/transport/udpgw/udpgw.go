@@ -9,8 +9,6 @@ import (
 	"net"
 	"sync"
 	"time"
-
-	"github.com/metacubex/mihomo/log"
 )
 
 const (
@@ -50,9 +48,7 @@ func NewPacketConn(conn net.Conn) *PacketConn {
 
 func (c *PacketConn) keepaliveLoop() {
 	defer func() {
-		if r := recover(); r != nil {
-			log.Debugln("[UDPGW] keepaliveLoop panic: %v", r)
-		}
+		recover()
 	}()
 
 	ticker := time.NewTicker(15 * time.Second)
@@ -63,15 +59,15 @@ func (c *PacketConn) keepaliveLoop() {
 		case <-c.ctx.Done():
 			return
 		case <-ticker.C:
-			c.mu.Lock()
 			if c.conn != nil {
 				buf := make([]byte, 5)
 				binary.LittleEndian.PutUint16(buf[0:2], 3)
 				buf[2] = FlagKeepalive
 				binary.LittleEndian.PutUint16(buf[3:5], 0)
+				
+				// Perform write without locking the entire packetconn to avoid blocking active Read/Write streams
 				c.conn.Write(buf)
 			}
-			c.mu.Unlock()
 		}
 	}
 }
@@ -79,8 +75,7 @@ func (c *PacketConn) keepaliveLoop() {
 func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Debugln("[UDPGW] WriteTo panic: %v", r)
-			err = errors.New("udpgw panic")
+			err = errors.New("udpgw write panic")
 		}
 	}()
 
@@ -148,24 +143,18 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 
 	copy(buf[offset:], p)
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	_, err = c.conn.Write(buf)
 	if err != nil {
-		log.Debugln("[UDPGW] WriteTo failed: %v", err)
 		return 0, err
 	}
 
-	log.Debugln("[UDPGW] Sent %d bytes to %s via conid %d (flags: %d)", payloadLen, addr.String(), c.conid, flags)
 	return len(p), nil
 }
 
 func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Debugln("[UDPGW] ReadFrom panic: %v", r)
-			err = errors.New("udpgw panic")
+			err = errors.New("udpgw read panic")
 		}
 	}()
 
@@ -227,7 +216,6 @@ func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 			Port: int(port),
 		}
 
-		log.Debugln("[UDPGW] Received %d bytes from %s via conid %d", payloadLen, udpAddr.String(), binary.LittleEndian.Uint16(buf[1:3]))
 		return payloadLen, udpAddr, nil
 	}
 }
