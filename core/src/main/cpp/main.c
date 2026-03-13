@@ -181,24 +181,35 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun2Socks(JNIEnv *env,
     char mtu_str[32];
     sprintf(mtu_str, "%d", mtu);
 
-    const char *raw_argv[] = {
+    const char *base_argv[] = {
         "tun2socks",
         "--netif-ipaddr", "172.19.0.2",
         "--netif-netmask", "255.255.255.252",
         "--socks-server-addr", socks,
-        "--udpgw-remote-server-addr", udpgw,
         "--dnsgw", dns,
         "--tunfd", fd_str,
         "--tunmtu", mtu_str,
         "--loglevel", "3"
     };
 
-    int argc = 17;
-    char **argv = malloc(sizeof(char *) * (argc + 1));
-    for (int i = 0; i < argc; i++) {
-        argv[i] = strdup(raw_argv[i]);
+    int argc = sizeof(base_argv) / sizeof(base_argv[0]);
+    int enable_udpgw = udpgw != NULL && strlen(udpgw) > 0;
+    if (enable_udpgw) {
+        argc += 2;
     }
-    argv[argc] = NULL;
+
+    char **argv = malloc(sizeof(char *) * (argc + 1));
+    int index = 0;
+    for (int i = 0; i < (int)(sizeof(base_argv) / sizeof(base_argv[0])); i++) {
+        argv[index++] = strdup(base_argv[i]);
+    }
+
+    if (enable_udpgw) {
+        argv[index++] = strdup("--udpgw-remote-server-addr");
+        argv[index++] = strdup(udpgw);
+    }
+
+    argv[index] = NULL;
 
     struct tun2socks_args *args = malloc(sizeof(struct tun2socks_args));
     args->argc = argc;
