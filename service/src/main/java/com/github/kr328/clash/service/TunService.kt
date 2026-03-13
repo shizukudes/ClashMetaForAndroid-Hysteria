@@ -155,15 +155,38 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
             }
 
             // Access Control
+            val usingTun2Socks = HysteriaModule.useTun2Socks
             when (store.accessControlMode) {
-                AccessControlMode.AcceptAll -> Unit
+                AccessControlMode.AcceptAll -> {
+                    // Clash mode: include app UID by default (legacy behavior).
+                    // Tun2Socks mode: app UID must bypass VPN to avoid self-capture routing loop.
+                    if (usingTun2Socks) {
+                        runCatching { addDisallowedApplication(packageName) }
+                    }
+                }
                 AccessControlMode.AcceptSelected -> {
-                    (store.accessControlPackages + packageName).forEach {
+                    // In allow-list mode, only selected apps are routed to VPN.
+                    // For Tun2Socks, do NOT add app package to allowed set (it should bypass VPN).
+                    val allowed = if (usingTun2Socks) {
+                        store.accessControlPackages
+                    } else {
+                        store.accessControlPackages + packageName
+                    }
+
+                    allowed.forEach {
                         runCatching { addAllowedApplication(it) }
                     }
                 }
                 AccessControlMode.DenySelected -> {
-                    (store.accessControlPackages - packageName).forEach {
+                    // In deny-list mode, all apps except listed ones are routed to VPN.
+                    // For Tun2Socks, force app package to bypass VPN.
+                    val disallowed = if (usingTun2Socks) {
+                        store.accessControlPackages + packageName
+                    } else {
+                        store.accessControlPackages - packageName
+                    }
+
+                    disallowed.forEach {
                         runCatching { addDisallowedApplication(it) }
                     }
                 }
@@ -229,9 +252,12 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
         if (HysteriaModule.useTun2Socks) {
             val socks = "127.0.0.1:${HysteriaModule.socksPort}"
             val udpgw = HysteriaModule.udpgwServer
-            val dns = "127.0.0.1:1053" // Redirect to Clash DNS
-            attachTun2Socks(device.fd, TUN_MTU, socks, udpgw, dns)
+            // Tun2Socks C handles DNS via --dnsgw (independent from Clash tun DNS hijack path).
+            // DNS gateway is parsed from Hysteria yaml template listen field (fallback 127.0.0.1:1053).
+            val dnsGateway = HysteriaModule.dnsGateway
+            attachTun2Socks(device.fd, TUN_MTU, socks, udpgw, dnsGateway)
         } else {
+            // Clash tun core handles DNS from TunDevice.dns and dns-hijack settings.
             attach(device)
         }
     }

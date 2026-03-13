@@ -398,45 +398,48 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
             }
         }
         
-        // Add UDPGW
-        if (config.udpForwarding) {
-            val udpgwRegex = Regex("""(?m)^\s*-\s*name:\s*["']?Hysteria-UDPGW["']?\s*$""")
-            val udpgwBlockStart = udpgwRegex.find(patchedYaml)
-            
-            if (udpgwBlockStart != null) {
-                val nextName = Regex("""(?m)^\s*-\s*name:\s*""")
-                    .find(patchedYaml, udpgwBlockStart.range.last + 1)
-                val blockEndExclusive = nextName?.range?.first ?: patchedYaml.length
-                val block = patchedYaml.substring(udpgwBlockStart.range.first, blockEndExclusive)
-                val patchedBlock = if (PORT_LINE_REGEX.containsMatchIn(block)) {
-                    block.replaceFirst(PORT_LINE_REGEX, "$1${config.udpgwPort}")
-                } else {
-                    "$block\n    port: ${config.udpgwPort}"
-                }
-    
-                patchedYaml = patchedYaml.substring(0, udpgwBlockStart.range.first) + patchedBlock + patchedYaml.substring(blockEndExclusive)
-            } else {
-                val udpgwEntry = "  - name: \"Hysteria-UDPGW\"\n    type: udpgw\n    server: 127.0.0.1\n    port: ${config.udpgwPort}"
-                patchedYaml = if (PROXIES_HEADER_REGEX.containsMatchIn(patchedYaml)) {
-                    patchedYaml.replaceFirst(PROXIES_HEADER_REGEX, "proxies:\n$udpgwEntry\n")
-                } else {
-                    "$patchedYaml\n\nproxies:\n$udpgwEntry\n"
-                }
-            }
-            
-            // Inject UDP rules
-            val rulesHeaderRegex = Regex("""(?m)^rules:\s*$""")
-            if (rulesHeaderRegex.containsMatchIn(patchedYaml)) {
-                if (!patchedYaml.contains("MATCH,Hysteria-UDPGW,udp")) {
-                    patchedYaml = patchedYaml.replaceFirst(rulesHeaderRegex, "rules:\n  - MATCH,Hysteria-UDPGW,udp")
-                }
-            } else {
-                patchedYaml = "$patchedYaml\n\nrules:\n  - MATCH,Hysteria-UDPGW,udp\n  - MATCH,Proxy\n"
-            }
-        }
+        // UDPGW proxy type is not suitable for Clash TCP routing and can generate
+        // "udpgw does not support tcp" errors when matched by generic rules.
+        // Keep UDPGW usage exclusive to native Tun2Socks path and strip legacy entries from YAML.
+        patchedYaml = stripUdpgwProxy(patchedYaml)
+        patchedYaml = stripUdpgwRule(patchedYaml)
+
 
         return patchedYaml
     }
+
+    private fun stripUdpgwProxy(yaml: String): String {
+        val lines = yaml.lines()
+        val out = mutableListOf<String>()
+        var skip = false
+
+        lines.forEach { line ->
+            val isProxyName = Regex("""^\s*-\s*name:\s*["']?Hysteria-UDPGW["']?\s*$""").matches(line)
+            val startsNewProxy = Regex("""^\s*-\s*name:\s*""").matches(line)
+
+            if (isProxyName) {
+                skip = true
+                return@forEach
+            }
+
+            if (skip && startsNewProxy) {
+                skip = false
+            }
+
+            if (!skip) {
+                out.add(line)
+            }
+        }
+
+        return out.joinToString("\n")
+    }
+
+    private fun stripUdpgwRule(yaml: String): String {
+        return yaml.lines()
+            .filterNot { Regex("""^\s*-\s*MATCH\s*,\s*Hysteria-UDPGW\s*,\s*udp\s*$""").matches(it) }
+            .joinToString("\n")
+    }
+
 
     private fun injectHysteriaMeta(yaml: String, activeAccount: HysteriaAccount?): String {
         val meta = buildString {
