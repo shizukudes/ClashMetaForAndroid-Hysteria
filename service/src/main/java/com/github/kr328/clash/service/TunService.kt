@@ -17,6 +17,7 @@ import com.github.kr328.clash.service.store.ServiceStore
 import com.github.kr328.clash.service.util.cancelAndJoinBlocking
 import com.github.kr328.clash.service.util.importedDir
 import com.github.kr328.clash.service.util.parseCIDR
+import com.github.kr328.clash.service.util.pendingDir
 import com.github.kr328.clash.service.util.sendClashStarted
 import com.github.kr328.clash.service.util.sendClashStopped
 import kotlinx.coroutines.*
@@ -290,8 +291,10 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
 
     private fun loadTun2SocksBootstrap(store: ServiceStore): Tun2SocksBootstrap? {
         val active = store.activeProfile ?: return null
-        val configFile = importedDir.resolve(active.toString()).resolve("hysteria.json")
-        if (!configFile.exists()) return null
+        val configFile = sequenceOf(
+            importedDir.resolve(active.toString()).resolve("hysteria.json"),
+            pendingDir.resolve(active.toString()).resolve("hysteria.json")
+        ).firstOrNull { it.exists() } ?: return null
 
         return runCatching {
             val config = Json { ignoreUnknownKeys = true }
