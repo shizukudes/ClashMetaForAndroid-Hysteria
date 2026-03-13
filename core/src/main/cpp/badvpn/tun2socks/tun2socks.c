@@ -492,56 +492,16 @@ int tun2socks_main (int argc, char **argv)
     }
 
 #ifdef ANDROID
-    // use supplied file descriptor
-    int sock, fd;
-    struct sockaddr_un addr;
-
-    if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-        BLog(BLOG_ERROR, "socket() failed: %s (socket sock = %d)\n", strerror(errno), sock);
+    // Android path: always use --tunfd supplied by JNI.
+    if (options.tun_fd <= 0) {
+        BLog(BLOG_ERROR, "missing or invalid --tunfd on Android");
         goto fail2;
     }
-
-    char *path = "/data/data/io.github.xSocks/sock_path";
-    unlink(path);
-    memset(&addr, 0, sizeof(addr));
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, path, sizeof(addr.sun_path)-1);
-
-    if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        BLog(BLOG_ERROR, "bind() failed: %s (sock = %d)\n", strerror(errno), sock);
-        close(sock);
-        goto fail2;
-    }
-
-    if (listen(sock, 5) == -1) {
-        BLog(BLOG_ERROR, "listen() failed: %s (sock = %d)\n", strerror(errno), sock);
-        close(sock);
-        goto fail2;
-    }
-
-    for (;;) {
-        int sock2;
-        struct sockaddr_un remote;
-        socklen_t t = (socklen_t)sizeof(remote);
-        if ((sock2 = accept(sock, (struct sockaddr *)&remote, &t)) == -1) { 
-            BLog(BLOG_ERROR, "accept() failed: %s (sock = %d)\n", strerror(errno), sock);
-            continue;
-        }
-        if (ancil_recv_fd(sock2, &fd)) {
-            BLog(BLOG_ERROR, "ancil_recv_fd: %s (sock = %d)\n", strerror(errno), sock2);
-            close(sock2);
-        } else {
-            close(sock2);
-            BLog(BLOG_INFO, "received fd = %d", fd);
-            break;
-        }
-    }
-    close(sock);
 
     struct BTap_init_data init_data;
     init_data.dev_type = BTAP_DEV_TUN;
     init_data.init_type = BTAP_INIT_FD;
-    init_data.init.fd.fd = fd;
+    init_data.init.fd.fd = options.tun_fd;
     init_data.init.fd.mtu = options.tun_mtu;
 
     if (!BTap_Init2(&device, &ss, init_data, device_error_handler, NULL)) {
