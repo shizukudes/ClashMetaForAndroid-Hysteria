@@ -24,16 +24,30 @@ import kotlinx.coroutines.selects.select
 import kotlinx.serialization.json.Json
 
 class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.Default) {
+    private data class Tun2SocksBootstrap(
+        val socksPort: Int,
+        val udpgwServer: String,
+        val dnsGateway: String,
+    )
+
     private val self: TunService
         get() = this
 
     private var reason: String? = null
+    @Volatile
+    private var tun2SocksBootstrap: Tun2SocksBootstrap? = null
 
     private val runtime = clashRuntime {
         val store = ServiceStore(self)
-        val tun2SocksMode = detectTun2SocksMode(store)
+        val bootstrap = loadTun2SocksBootstrap(store)
+        tun2SocksBootstrap = bootstrap
+        val tun2SocksMode = bootstrap != null
 
         if (tun2SocksMode) {
+            HysteriaModule.useTun2Socks = true
+            HysteriaModule.socksPort = bootstrap!!.socksPort
+            HysteriaModule.udpgwServer = bootstrap.udpgwServer
+            HysteriaModule.dnsGateway = bootstrap.dnsGateway
             HysteriaModule.runClashTun = false
             Log.i("TunService: Tun2Socks mode detected, skipping Clash configuration module")
         }
@@ -164,7 +178,7 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
             }
 
             // Access Control
-            val usingTun2Socks = HysteriaModule.useTun2Socks
+            val usingTun2Socks = tun2SocksBootstrap != null
             when (store.accessControlMode) {
                 AccessControlMode.AcceptAll -> {
                     // Clash mode: include app UID by default (legacy behavior).
@@ -258,12 +272,13 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
             )
         }
 
-        if (HysteriaModule.useTun2Socks) {
-            val socks = "127.0.0.1:${HysteriaModule.socksPort}"
-            val udpgw = HysteriaModule.udpgwServer
+        val bootstrap = tun2SocksBootstrap
+        if (bootstrap != null) {
+            val socks = "127.0.0.1:${bootstrap.socksPort}"
+            val udpgw = bootstrap.udpgwServer
             // Tun2Socks C handles DNS via --dnsgw (independent from Clash tun DNS hijack path).
             // DNS gateway is configurable from Hysteria settings (fallback to YAML dns.listen / 127.0.0.1:1053).
-            val dnsGateway = HysteriaModule.dnsGateway
+            val dnsGateway = bootstrap.dnsGateway
             attachTun2Socks(device.fd, TUN_MTU, socks, udpgw, dnsGateway)
         } else if (HysteriaModule.runClashTun) {
             // Clash tun core handles DNS from TunDevice.dns and dns-hijack settings.
@@ -273,27 +288,57 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
         }
     }
 
-    private fun detectTun2SocksMode(store: ServiceStore): Boolean {
-        val active = store.activeProfile ?: return false
+    private fun loadTun2SocksBootstrap(store: ServiceStore): Tun2SocksBootstrap? {
+        val active = store.activeProfile ?: return null
         val configFile = importedDir.resolve(active.toString()).resolve("hysteria.json")
-        if (!configFile.exists()) return false
+        if (!configFile.exists()) return null
 
         return runCatching {
             val config = Json { ignoreUnknownKeys = true }
                 .decodeFromString(HysteriaConfig.serializer(), configFile.readText())
             val enabledAccounts = config.accounts.filter { it.enabled }
             if (!config.enabled || enabledAccounts.isEmpty()) {
-                false
+                null
             } else {
                 val activeAccount = config.activeAccountId
                     ?.let { activeId -> enabledAccounts.firstOrNull { it.id == activeId } }
                     ?: enabledAccounts.firstOrNull()
-                activeAccount?.tunCore == "Tun2Socks"
+
+                if (activeAccount?.tunCore != "Tun2Socks") {
+                    null
+                } else {
+                    val socksPort = config.localPort
+                    val udpgw = activeAccount.udpgwServer.trim().takeIf {
+                        it.isNotBlank() && isValidHostPort(it) && !isLoopbackHostPort(it)
+                    } ?: ""
+                    val dnsGateway = if (config.tun2SocksUsePdnsd) {
+                        "127.0.0.1:${config.pdnsdListenPort}"
+                    } else {
+                        config.tun2SocksDnsGateway.trim().takeIf { isValidHostPort(it) } ?: "127.0.0.1:1053"
+                    }
+
+                    Tun2SocksBootstrap(
+                        socksPort = socksPort,
+                        udpgwServer = udpgw,
+                        dnsGateway = dnsGateway,
+                    )
+                }
             }
         }.getOrElse {
             Log.w("TunService: Failed to detect Tun2Socks mode (${it.message})")
-            false
+            null
         }
+    }
+
+    private fun isLoopbackHostPort(value: String): Boolean {
+        val host = value.substringBefore(':', "").trim().lowercase()
+        return host == "127.0.0.1" || host == "localhost"
+    }
+
+    private fun isValidHostPort(value: String): Boolean {
+        val host = value.substringBefore(':', "").trim()
+        val port = value.substringAfter(':', "").trim().toIntOrNull() ?: return false
+        return host.isNotBlank() && port in 1..65535
     }
 
     companion object {
