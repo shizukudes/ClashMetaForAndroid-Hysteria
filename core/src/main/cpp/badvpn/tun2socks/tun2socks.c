@@ -522,7 +522,7 @@ int tun2socks_main (int argc, char **argv)
     for (;;) {
         int sock2;
         struct sockaddr_un remote;
-        int t = sizeof(remote);
+        socklen_t t = (socklen_t)sizeof(remote);
         if ((sock2 = accept(sock, (struct sockaddr *)&remote, &t)) == -1) { 
             BLog(BLOG_ERROR, "accept() failed: %s (sock = %d)\n", strerror(errno), sock);
             continue;
@@ -632,7 +632,7 @@ int tun2socks_main (int argc, char **argv)
 
     // free clients
     LinkedList1Node *node;
-    while (node = LinkedList1_GetFirst(&tcp_clients)) {
+    while ((node = LinkedList1_GetFirst(&tcp_clients)) != NULL) {
         struct tcp_client *client = UPPER_OBJECT(node, struct tcp_client, list_node);
         client_murder(client);
     }
@@ -1641,7 +1641,7 @@ err_t common_netif_output (struct netif *netif, struct pbuf *p)
             }
             memcpy(device_write_buf + len, p->payload, p->len);
             len += p->len;
-        } while (p = p->next);
+        } while ((p = p->next) != NULL);
 
         SYNC_FROMHERE
         BTap_Send(&device, device_write_buf, len);
@@ -1966,7 +1966,11 @@ err_t client_recv_func (void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t e
     }
 
     // copy data to buffer
-    ASSERT_EXECUTE(pbuf_copy_partial(p, client->buf + client->buf_used, p->tot_len, 0) == p->tot_len)
+    int copied = pbuf_copy_partial(p, client->buf + client->buf_used, p->tot_len, 0);
+    if (copied != p->tot_len) {
+        client_log(client, BLOG_ERROR, "failed to copy packet payload");
+        return ERR_MEM;
+    }
     client->buf_used += p->tot_len;
 
     // if there was nothing in the buffer before, and SOCKS is up, start send data
