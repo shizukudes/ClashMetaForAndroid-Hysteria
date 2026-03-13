@@ -129,7 +129,29 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun(JNIEnv *env, jobje
     startTun(fd, _stack, _gateway, _portal, _dns, _interface);
 }
 
+#include <pthread.h>
+#include <stdlib.h>
+#include <string.h>
+
 extern int tun2socks_main(int argc, char **argv);
+
+struct tun2socks_args {
+    int argc;
+    char **argv;
+};
+
+void *tun2socks_thread_func(void *arg) {
+    struct tun2socks_args *args = (struct tun2socks_args *)arg;
+    tun2socks_main(args->argc, args->argv);
+    
+    // Cleanup if it ever returns
+    for (int i = 0; i < args->argc; i++) {
+        free(args->argv[i]);
+    }
+    free(args->argv);
+    free(args);
+    return NULL;
+}
 
 JNIEXPORT void JNICALL
 Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun2Socks(JNIEnv *env, jobject thiz,
@@ -149,20 +171,32 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun2Socks(JNIEnv *env,
     char mtu_str[32];
     sprintf(mtu_str, "%d", mtu);
 
-    char *argv[] = {
+    const char *raw_argv[] = {
         "tun2socks",
         "--netif-ipaddr", "172.19.0.2",
         "--netif-netmask", "255.255.255.252",
-        "--socks-server-addr", (char *)socks,
-        "--udpgw-remote-server-addr", (char *)udpgw,
-        "--dnsgw", (char *)dns,
+        "--socks-server-addr", socks,
+        "--udpgw-remote-server-addr", udpgw,
+        "--dnsgw", dns,
         "--tunfd", fd_str,
         "--tunmtu", mtu_str,
-        "--loglevel", "3",
-        NULL
+        "--loglevel", "3"
     };
 
-    tun2socks_main(15, argv);
+    int argc = 17;
+    char **argv = malloc(sizeof(char *) * (argc + 1));
+    for (int i = 0; i < argc; i++) {
+        argv[i] = strdup(raw_argv[i]);
+    }
+    argv[argc] = NULL;
+
+    struct tun2socks_args *args = malloc(sizeof(struct tun2socks_args));
+    args->argc = argc;
+    args->argv = argv;
+
+    pthread_t tid;
+    pthread_create(&tid, NULL, tun2socks_thread_func, args);
+    pthread_detach(tid);
 
     (*env)->ReleaseStringUTFChars(env, socksServer, socks);
     (*env)->ReleaseStringUTFChars(env, udpgwServer, udpgw);
