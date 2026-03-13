@@ -132,6 +132,7 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun(JNIEnv *env, jobje
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 extern int tun2socks_main(int argc, char **argv);
 
@@ -139,6 +140,8 @@ struct tun2socks_args {
     int argc;
     char **argv;
 };
+
+static int tun2socks_fd = -1;
 
 void *tun2socks_thread_func(void *arg) {
     struct tun2socks_args *args = (struct tun2socks_args *)arg;
@@ -161,6 +164,13 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun2Socks(JNIEnv *env,
                                                                     jstring udpgwServer,
                                                                     jstring dnsServer) {
     TRACE_METHOD();
+
+    if (tun2socks_fd >= 0) {
+        close(tun2socks_fd);
+        tun2socks_fd = -1;
+    }
+
+    tun2socks_fd = fd;
 
     const char *socks = (*env)->GetStringUTFChars(env, socksServer, 0);
     const char *udpgw = (*env)->GetStringUTFChars(env, udpgwServer, 0);
@@ -206,6 +216,11 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun2Socks(JNIEnv *env,
 JNIEXPORT void JNICALL
 Java_com_github_kr328_clash_core_bridge_Bridge_nativeStopTun(JNIEnv *env, jobject thiz) {
     TRACE_METHOD();
+
+    if (tun2socks_fd >= 0) {
+        close(tun2socks_fd);
+        tun2socks_fd = -1;
+    }
 
     stopTun();
 }
