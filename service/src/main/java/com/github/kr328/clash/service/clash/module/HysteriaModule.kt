@@ -170,7 +170,7 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             }
 
             if (trimmed.startsWith("listen:")) {
-                val value = trimmed.removePrefix("listen:").trim().trim('"', ''')
+                val value = trimmed.removePrefix("listen:").trim().trim('"', '\'')
                 if (value.isNotBlank()) {
                     return value
                 }
