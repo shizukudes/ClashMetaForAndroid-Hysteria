@@ -27,7 +27,9 @@
 #include <config.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#if !defined(_LINUX_IF_H)
 #include <net/if.h>
+#endif
 #include <sys/types.h>
 #include <inttypes.h>
 #include "rr_types.h"

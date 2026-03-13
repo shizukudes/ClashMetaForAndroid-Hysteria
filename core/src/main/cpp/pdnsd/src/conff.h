@@ -32,7 +32,9 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <sys/socket.h>
+#if !defined(_LINUX_IF_H)
 #include <net/if.h>
+#endif
 #include "ipvers.h"
 #include "list.h"
 
