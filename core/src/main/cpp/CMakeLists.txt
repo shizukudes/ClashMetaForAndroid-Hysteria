@@ -148,10 +148,10 @@ target_link_libraries(bridge log clash)
 
 
 # --- pdnsd executable (optional; source is legacy and may require dedicated toolchain flags) ---
-option(ENABLE_PDNSD "Build pdnsd executable" OFF)
+option(ENABLE_PDNSD "Build pdnsd executable" ON)
 if (ENABLE_PDNSD)
     file(GLOB PDNSD_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/pdnsd/src/*.c")
     add_executable(pdnsd ${PDNSD_SOURCES})
-    target_compile_options(pdnsd PRIVATE -Wno-parentheses -Wno-unused-value -Wno-pointer-sign)
+    target_compile_options(pdnsd PRIVATE -Wno-parentheses -Wno-unused-value -Wno-pointer-sign -Wno-gnu-designator)
     target_include_directories(pdnsd PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/pdnsd)
 endif ()

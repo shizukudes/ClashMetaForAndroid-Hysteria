@@ -287,8 +287,8 @@ inline static char *stpcpy (char *dest, const char *src)
 }
 #endif
 
-#if !defined(HAVE_MEMPCPY)
-#if !defined(HAVE_MEMPCPY)
+// Provide mempcpy only when libc does not provide it.
+#if !defined(HAVE_MEMPCPY) && !defined(__GLIBC__) && !defined(__BIONIC__)
 inline static void *mempcpy(void *dest, const void *src, size_t len)
   __attribute__((always_inline));
 inline static void *mempcpy(void *dest, const void *src, size_t len)
