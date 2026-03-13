@@ -142,10 +142,16 @@ set(TUN2SOCKS_SOURCES
 )
 
 add_library(bridge SHARED main.c jni_helper.c bridge_helper.c ${TUN2SOCKS_SOURCES})
+# badvpn upstream emits several warnings on modern clang; keep native build stable across NDK updates.
+target_compile_options(bridge PRIVATE -Wno-parentheses -Wno-unused-value -Wno-pointer-sign)
 target_link_libraries(bridge log clash)
 
 
-# --- pdnsd executable (xsocks-android-ref parity) ---
-file(GLOB PDNSD_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/pdnsd/src/*.c")
-add_executable(pdnsd ${PDNSD_SOURCES})
-target_include_directories(pdnsd PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/pdnsd)
+# --- pdnsd executable (optional; source is legacy and may require dedicated toolchain flags) ---
+option(ENABLE_PDNSD "Build pdnsd executable" OFF)
+if (ENABLE_PDNSD)
+    file(GLOB PDNSD_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/pdnsd/src/*.c")
+    add_executable(pdnsd ${PDNSD_SOURCES})
+    target_compile_options(pdnsd PRIVATE -Wno-parentheses -Wno-unused-value -Wno-pointer-sign)
+    target_include_directories(pdnsd PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/pdnsd)
+endif ()
