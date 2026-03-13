@@ -11,6 +11,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
 import java.io.File
+import java.net.Inet4Address
+import java.net.InetAddress
 import java.net.ServerSocket
 import java.util.concurrent.TimeUnit
 
@@ -171,13 +173,30 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
 
             if (trimmed.startsWith("listen:")) {
                 val value = trimmed.removePrefix("listen:").trim().trim('"', '\'')
-                if (value.isNotBlank()) {
+                if (isValidTun2SocksDnsGateway(value)) {
                     return value
+                }
+
+                if (value.isNotBlank()) {
+                    Log.w("HysteriaModule: Unsupported dns.listen for Tun2Socks ($value), fallback to 127.0.0.1:1053")
                 }
             }
         }
 
         return "127.0.0.1:1053"
+    }
+
+    private fun isValidTun2SocksDnsGateway(value: String): Boolean {
+        val host = value.substringBefore(':', "")
+        val port = value.substringAfter(':', "")
+
+        if (host.isBlank() || port.isBlank()) return false
+
+        val portInt = port.toIntOrNull() ?: return false
+        if (portInt !in 1..65535) return false
+
+        val ip = runCatching { InetAddress.getByName(host) }.getOrNull() ?: return false
+        return ip is Inet4Address
     }
 
     private fun reserveFreePort(usedPorts: MutableSet<Int>): Int {
