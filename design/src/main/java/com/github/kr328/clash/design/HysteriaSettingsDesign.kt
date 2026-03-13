@@ -100,6 +100,34 @@ class HysteriaSettingsDesign(
             )
 
             editableText(
+                value = config::tun2SocksDnsGateway,
+                adapter = TextAdapter.String,
+                title = R.string.hysteria_tun2socks_dns_gateway,
+                icon = R.drawable.ic_baseline_dns,
+            )
+
+            switch(
+                value = config::tun2SocksUsePdnsd,
+                icon = R.drawable.ic_baseline_dns,
+                title = R.string.hysteria_tun2socks_use_pdnsd,
+                summary = R.string.hysteria_tun2socks_use_pdnsd_summary,
+            )
+
+            editableText(
+                value = config::pdnsdListenPort,
+                adapter = NullableTextAdapter.Int,
+                title = R.string.hysteria_pdnsd_listen_port,
+                icon = R.drawable.ic_baseline_edit,
+            )
+
+            editableText(
+                value = config::pdnsdUpstreams,
+                adapter = TextAdapter.String,
+                title = R.string.hysteria_pdnsd_upstreams,
+                icon = R.drawable.ic_baseline_edit,
+            )
+
+            editableText(
                 value = config::recvWindowConn,
                 adapter = NullableTextAdapter.Int,
                 title = R.string.hysteria_recv_window_conn,

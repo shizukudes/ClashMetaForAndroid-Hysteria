@@ -293,6 +293,20 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
             throw IllegalArgumentException("recv-window values must be > 0")
         }
 
+        if (config.udpgwPort !in 1..65535) {
+            throw IllegalArgumentException("Invalid UDPGW port: ${config.udpgwPort}")
+        }
+
+        if (config.pdnsdListenPort !in 1..65535) {
+            throw IllegalArgumentException("Invalid PDNSD listen port: ${config.pdnsdListenPort}")
+        }
+
+        val dnsGateway = config.tun2SocksDnsGateway.trim()
+        if (dnsGateway.isNotBlank() && !isValidHostPort(dnsGateway)) {
+            throw IllegalArgumentException("Invalid Tun2Socks DNS gateway: $dnsGateway")
+        }
+        config.tun2SocksDnsGateway = dnsGateway
+
         val normalizedLevel = config.logLevel.trim().lowercase()
         if (normalizedLevel !in setOf("silent", "error", "info", "debug")) {
             throw IllegalArgumentException("Unsupported log level: ${config.logLevel}")
@@ -326,6 +340,12 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
         }
 
         account.serverPortRange = if (from == to) "$from" else "$from-$to"
+    }
+
+    private fun isValidHostPort(value: String): Boolean {
+        val host = value.substringBefore(':', "").trim()
+        val port = value.substringAfter(':', "").trim().toIntOrNull() ?: return false
+        return host.isNotBlank() && port in 1..65535
     }
 
     private fun defaultTemplate(localPort: Int): String {

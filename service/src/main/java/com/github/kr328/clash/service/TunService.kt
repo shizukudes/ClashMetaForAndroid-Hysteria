@@ -253,12 +253,14 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
             val socks = "127.0.0.1:${HysteriaModule.socksPort}"
             val udpgw = HysteriaModule.udpgwServer
             // Tun2Socks C handles DNS via --dnsgw (independent from Clash tun DNS hijack path).
-            // DNS gateway is parsed from Hysteria yaml template listen field (fallback 127.0.0.1:1053).
+            // DNS gateway is configurable from Hysteria settings (fallback to YAML dns.listen / 127.0.0.1:1053).
             val dnsGateway = HysteriaModule.dnsGateway
             attachTun2Socks(device.fd, TUN_MTU, socks, udpgw, dnsGateway)
-        } else {
+        } else if (HysteriaModule.runClashTun) {
             // Clash tun core handles DNS from TunDevice.dns and dns-hijack settings.
             attach(device)
+        } else {
+            throw IllegalStateException("No tunnel core selected")
         }
     }
 

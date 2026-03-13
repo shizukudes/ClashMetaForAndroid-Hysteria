@@ -25,6 +25,10 @@ data class HysteriaConfig(
     var yamlTemplate: String = "",
     var udpForwarding: Boolean = true,
     var udpgwPort: Int = 7300,
+    var tun2SocksDnsGateway: String = "127.0.0.1:1053",
+    var tun2SocksUsePdnsd: Boolean = true,
+    var pdnsdListenPort: Int = 1053,
+    var pdnsdUpstreams: String = "208.67.222.222:443,208.67.220.220:443",
     var accounts: List<HysteriaAccount> = emptyList(),
     var activeAccountId: String? = null,
 )

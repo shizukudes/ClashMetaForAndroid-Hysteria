@@ -27,6 +27,7 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         var udpgwServer: String = ""
         var dnsGateway: String = "127.0.0.1:1053"
         var usePdnsd: Boolean = false
+        var runClashTun: Boolean = true
 
         fun requestStop() {
             useTun2Socks = false
@@ -34,6 +35,7 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             udpgwServer = ""
             dnsGateway = "127.0.0.1:1053"
             usePdnsd = false
+            runClashTun = true
         }
     }
 
@@ -66,6 +68,7 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
 
         if (runtimeAccounts.isNotEmpty() && runtimeAccounts[0].tunCore == "Tun2Socks") {
             useTun2Socks = true
+            runClashTun = false
             socksPort = config.localPort
             udpgwServer = if (config.udpForwarding) runtimeAccounts[0].udpgwServer.trim() else ""
             if (config.udpForwarding && (udpgwServer.isBlank() || isLoopbackHostPort(udpgwServer))) {
@@ -79,10 +82,10 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
                 udpgwServer = ""
             }
 
-            dnsGateway = parseDnsGateway(config.yamlTemplate)
-            usePdnsd = startPdnsdIfAvailable(runtimeAccounts[0], config.yamlTemplate)
+            dnsGateway = config.tun2SocksDnsGateway.trim().ifBlank { parseDnsGateway(config.yamlTemplate) }
+            usePdnsd = config.tun2SocksUsePdnsd && startPdnsdIfAvailable(config)
             if (usePdnsd) {
-                dnsGateway = "127.0.0.1:1053"
+                dnsGateway = "127.0.0.1:${config.pdnsdListenPort}"
             }
 
             Log.i("HysteriaModule: Tun2Socks Core C enabled (SOCKS 127.0.0.1:$socksPort, UDPGW: ${if (udpgwServer.isBlank()) "disabled" else udpgwServer}, DNSGW: $dnsGateway, PDNSD: ${if (usePdnsd) "enabled" else "disabled"})")
@@ -220,24 +223,24 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
 
 
 
-    private fun startPdnsdIfAvailable(account: HysteriaAccount, yamlTemplate: String): Boolean {
+    private fun startPdnsdIfAvailable(config: HysteriaConfig): Boolean {
         val pdnsd = File(service.applicationInfo.nativeLibraryDir, "pdnsd")
         if (!pdnsd.exists()) {
             Log.w("HysteriaModule: pdnsd executable not found, fallback to Clash DNS")
             return false
         }
 
-        val upstreams = parseUpstreamDnsServers(yamlTemplate)
-            .ifEmpty { listOf("1.1.1.1", "8.8.8.8") }
+        val upstreams = parseConfiguredDnsUpstreams(config)
+            .ifEmpty { listOf(DnsEndpoint("208.67.222.222", 443), DnsEndpoint("208.67.220.220", 443)) }
 
         val conf = File(service.filesDir, "pdnsd.conf")
         val cacheDir = File(service.filesDir, "pdnsd-cache").apply { mkdirs() }
-        val serverBlocks = upstreams.mapIndexed { idx, ip ->
+        val serverBlocks = upstreams.mapIndexed { idx, endpoint ->
             """
             server {
               label="ns$idx";
-              ip=$ip;
-              port=53;
+              ip=${endpoint.host};
+              port=${endpoint.port};
               timeout=6;
               uptest=none;
               interval=10m;
@@ -252,8 +255,8 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
               perm_cache=2048;
               cache_dir="${cacheDir.absolutePath}";
               server_ip=127.0.0.1;
-              server_port=1053;
-              query_method=udp_tcp;
+              server_port=${config.pdnsdListenPort};
+              query_method=tcp_only;
               timeout=10;
               min_ttl=15m;
               max_ttl=1w;
@@ -280,7 +283,7 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             pb.redirectErrorStream(true)
             val p = pb.start()
             processes.add(p)
-            Log.i("HysteriaModule: Started pdnsd for Tun2Socks DNS at 127.0.0.1:1053 with upstreams=$upstreams")
+            Log.i("HysteriaModule: Started pdnsd for Tun2Socks DNS at 127.0.0.1:${config.pdnsdListenPort} with upstreams=$upstreams")
             true
         }.getOrElse {
             Log.w("HysteriaModule: Failed to start pdnsd (${it.message}), fallback to Clash DNS")
@@ -288,9 +291,23 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         }
     }
 
-    private fun parseUpstreamDnsServers(yamlTemplate: String): List<String> {
+    private data class DnsEndpoint(val host: String, val port: Int)
+
+    private fun parseConfiguredDnsUpstreams(config: HysteriaConfig): List<DnsEndpoint> {
+        val fromUi = config.pdnsdUpstreams
+            .split(',')
+            .mapNotNull { parseDnsEndpoint(it.trim()) }
+
+        if (fromUi.isNotEmpty()) {
+            return fromUi.distinct()
+        }
+
+        return parseUpstreamDnsServers(config.yamlTemplate)
+    }
+
+    private fun parseUpstreamDnsServers(yamlTemplate: String): List<DnsEndpoint> {
         val lines = yamlTemplate.lines()
-        val servers = mutableListOf<String>()
+        val servers = mutableListOf<DnsEndpoint>()
         var inDnsBlock = false
         var dnsIndent = 0
         var inNameServer = false
@@ -334,16 +351,35 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
 
             if (trimmed.startsWith("-")) {
                 val value = trimmed.removePrefix("-").trim().trim('"', '\'')
-                val host = value.substringBefore(':').substringAfter("https://").substringAfter("tls://")
-                val normalized = host.substringBefore('/').trim()
-                val ip = runCatching { InetAddress.getByName(normalized) }.getOrNull()
-                if (ip is Inet4Address) {
-                    servers.add(ip.hostAddress ?: normalized)
-                }
+                parseDnsEndpoint(value)?.let { servers.add(it) }
             }
         }
 
         return servers.distinct()
+    }
+
+    private fun parseDnsEndpoint(raw: String): DnsEndpoint? {
+        if (raw.isBlank()) return null
+
+        val withoutScheme = raw
+            .substringAfter("https://", raw)
+            .substringAfter("tls://", raw)
+            .substringAfter("tcp://", raw)
+            .substringBefore('/')
+            .trim()
+
+        if (withoutScheme.isBlank()) return null
+
+        val host = withoutScheme.substringBefore(':').trim()
+        val portText = withoutScheme.substringAfter(':', "")
+        val port = portText.toIntOrNull() ?: if (raw.startsWith("https://") || raw.startsWith("tls://") || raw.startsWith("tcp://")) 443 else 53
+
+        if (host.isBlank() || port !in 1..65535) return null
+
+        val ip = runCatching { InetAddress.getByName(host) }.getOrNull() ?: return null
+        if (ip !is Inet4Address) return null
+
+        return DnsEndpoint(ip.hostAddress ?: host, port)
     }
 
 
