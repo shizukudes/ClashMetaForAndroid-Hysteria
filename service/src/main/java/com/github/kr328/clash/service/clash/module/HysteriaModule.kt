@@ -67,7 +67,8 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             socksPort = config.localPort
             udpgwServer = if (config.udpForwarding) runtimeAccounts[0].udpgwServer.trim() else ""
             if (config.udpForwarding && (udpgwServer.isBlank() || isLoopbackHostPort(udpgwServer))) {
-                udpgwServer = "${runtimeAccounts[0].serverIp}:${config.udpgwPort}"
+                val derivedPort = udpgwServer.substringAfter(':', "").toIntOrNull() ?: config.udpgwPort
+                udpgwServer = "${runtimeAccounts[0].serverIp}:$derivedPort"
                 Log.i("HysteriaModule: Using derived remote UDPGW endpoint $udpgwServer")
             }
 
