@@ -132,6 +132,7 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun(JNIEnv *env, jobje
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 extern int tun2socks_main(int argc, char **argv);
 
@@ -139,6 +140,16 @@ struct tun2socks_args {
     int argc;
     char **argv;
 };
+
+static int tun2socks_fd = -1;
+static pthread_mutex_t tun2socks_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static void close_tun2socks_fd_locked() {
+    if (tun2socks_fd >= 0) {
+        close(tun2socks_fd);
+        tun2socks_fd = -1;
+    }
+}
 
 void *tun2socks_thread_func(void *arg) {
     struct tun2socks_args *args = (struct tun2socks_args *)arg;
@@ -162,40 +173,107 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun2Socks(JNIEnv *env,
                                                                     jstring dnsServer) {
     TRACE_METHOD();
 
+    pthread_mutex_lock(&tun2socks_lock);
+    close_tun2socks_fd_locked();
+    tun2socks_fd = fd;
+    pthread_mutex_unlock(&tun2socks_lock);
+
     const char *socks = (*env)->GetStringUTFChars(env, socksServer, 0);
     const char *udpgw = (*env)->GetStringUTFChars(env, udpgwServer, 0);
     const char *dns = (*env)->GetStringUTFChars(env, dnsServer, 0);
+
+    if (!socks || !udpgw || !dns || strlen(socks) == 0 || strlen(dns) == 0) {
+        pthread_mutex_lock(&tun2socks_lock);
+        close_tun2socks_fd_locked();
+        pthread_mutex_unlock(&tun2socks_lock);
+
+        if (socks) (*env)->ReleaseStringUTFChars(env, socksServer, socks);
+        if (udpgw) (*env)->ReleaseStringUTFChars(env, udpgwServer, udpgw);
+        if (dns) (*env)->ReleaseStringUTFChars(env, dnsServer, dns);
+        return;
+    }
 
     char fd_str[32];
     sprintf(fd_str, "%d", fd);
     char mtu_str[32];
     sprintf(mtu_str, "%d", mtu);
 
-    const char *raw_argv[] = {
+    const char *base_argv[] = {
         "tun2socks",
         "--netif-ipaddr", "172.19.0.2",
         "--netif-netmask", "255.255.255.252",
         "--socks-server-addr", socks,
-        "--udpgw-remote-server-addr", udpgw,
         "--dnsgw", dns,
         "--tunfd", fd_str,
         "--tunmtu", mtu_str,
         "--loglevel", "3"
     };
 
-    int argc = 17;
-    char **argv = malloc(sizeof(char *) * (argc + 1));
-    for (int i = 0; i < argc; i++) {
-        argv[i] = strdup(raw_argv[i]);
+    int argc = sizeof(base_argv) / sizeof(base_argv[0]);
+    int enable_udpgw = udpgw != NULL && strlen(udpgw) > 0;
+    if (enable_udpgw) {
+        argc += 3;
     }
-    argv[argc] = NULL;
+
+    char **argv = malloc(sizeof(char *) * (argc + 1));
+    if (argv == NULL) {
+        pthread_mutex_lock(&tun2socks_lock);
+        close_tun2socks_fd_locked();
+        pthread_mutex_unlock(&tun2socks_lock);
+
+        (*env)->ReleaseStringUTFChars(env, socksServer, socks);
+        (*env)->ReleaseStringUTFChars(env, udpgwServer, udpgw);
+        (*env)->ReleaseStringUTFChars(env, dnsServer, dns);
+        return;
+    }
+
+    int index = 0;
+    for (int i = 0; i < (int)(sizeof(base_argv) / sizeof(base_argv[0])); i++) {
+        argv[index++] = strdup(base_argv[i]);
+    }
+
+    if (enable_udpgw) {
+        argv[index++] = strdup("--udpgw-remote-server-addr");
+        argv[index++] = strdup(udpgw);
+        argv[index++] = strdup("--udpgw-transparent-dns");
+    }
+
+    argv[index] = NULL;
 
     struct tun2socks_args *args = malloc(sizeof(struct tun2socks_args));
+    if (args == NULL) {
+        for (int i = 0; i < index; i++) free(argv[i]);
+        free(argv);
+
+        pthread_mutex_lock(&tun2socks_lock);
+        close_tun2socks_fd_locked();
+        pthread_mutex_unlock(&tun2socks_lock);
+
+        (*env)->ReleaseStringUTFChars(env, socksServer, socks);
+        (*env)->ReleaseStringUTFChars(env, udpgwServer, udpgw);
+        (*env)->ReleaseStringUTFChars(env, dnsServer, dns);
+        return;
+    }
+
     args->argc = argc;
     args->argv = argv;
 
     pthread_t tid;
-    pthread_create(&tid, NULL, tun2socks_thread_func, args);
+    int create_result = pthread_create(&tid, NULL, tun2socks_thread_func, args);
+    if (create_result != 0) {
+        for (int i = 0; i < index; i++) free(argv[i]);
+        free(argv);
+        free(args);
+
+        pthread_mutex_lock(&tun2socks_lock);
+        close_tun2socks_fd_locked();
+        pthread_mutex_unlock(&tun2socks_lock);
+
+        (*env)->ReleaseStringUTFChars(env, socksServer, socks);
+        (*env)->ReleaseStringUTFChars(env, udpgwServer, udpgw);
+        (*env)->ReleaseStringUTFChars(env, dnsServer, dns);
+        return;
+    }
     pthread_detach(tid);
 
     (*env)->ReleaseStringUTFChars(env, socksServer, socks);
@@ -206,6 +284,10 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun2Socks(JNIEnv *env,
 JNIEXPORT void JNICALL
 Java_com_github_kr328_clash_core_bridge_Bridge_nativeStopTun(JNIEnv *env, jobject thiz) {
     TRACE_METHOD();
+
+    pthread_mutex_lock(&tun2socks_lock);
+    close_tun2socks_fd_locked();
+    pthread_mutex_unlock(&tun2socks_lock);
 
     stopTun();
 }
