@@ -80,7 +80,7 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             }
 
             dnsGateway = parseDnsGateway(config.yamlTemplate)
-            usePdnsd = startPdnsdIfAvailable(runtimeAccounts[0])
+            usePdnsd = startPdnsdIfAvailable(runtimeAccounts[0], config.yamlTemplate)
             if (usePdnsd) {
                 dnsGateway = "127.0.0.1:1053"
             }
@@ -220,47 +220,132 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
 
 
 
-    private fun startPdnsdIfAvailable(account: HysteriaAccount): Boolean {
+    private fun startPdnsdIfAvailable(account: HysteriaAccount, yamlTemplate: String): Boolean {
         val pdnsd = File(service.applicationInfo.nativeLibraryDir, "pdnsd")
         if (!pdnsd.exists()) {
             Log.w("HysteriaModule: pdnsd executable not found, fallback to Clash DNS")
             return false
         }
 
+        val upstreams = parseUpstreamDnsServers(yamlTemplate)
+            .ifEmpty { listOf("1.1.1.1", "8.8.8.8") }
+
         val conf = File(service.filesDir, "pdnsd.conf")
         val cacheDir = File(service.filesDir, "pdnsd-cache").apply { mkdirs() }
+        val serverBlocks = upstreams.mapIndexed { idx, ip ->
+            """
+            server {
+              label="ns$idx";
+              ip=$ip;
+              port=53;
+              timeout=6;
+              uptest=none;
+              interval=10m;
+              purge_cache=off;
+            }
+            """.trimIndent()
+        }.joinToString("\n\n")
+
         conf.writeText(
             """
             global {
-              perm_cache=1024;
+              perm_cache=2048;
               cache_dir="${cacheDir.absolutePath}";
-              server_port=1053;
               server_ip=127.0.0.1;
-              status_ctl=off;
-              query_method=tcp_only;
+              server_port=1053;
+              query_method=udp_tcp;
+              timeout=10;
               min_ttl=15m;
               max_ttl=1w;
-              timeout=10;
+              neg_domain_pol=on;
               daemon=off;
+              status_ctl=off;
             }
-            server {
-              label="remote";
-              ip=${account.serverIp};
-              port=53;
-              uptest=none;
+
+            $serverBlocks
+
+            rr {
+              name=localhost;
+              reverse=on;
+              a=127.0.0.1;
+              owner=localhost;
+              soa=localhost,root.localhost,42,86400,900,86400,86400;
             }
-            rr { name=localhost; reverse=on; a=127.0.0.1; owner=localhost; soa=localhost,root.localhost,42,86400,900,86400,86400; }
             """.trimIndent()
         )
 
-        val pb = ProcessBuilder(pdnsd.absolutePath, "-c", conf.absolutePath, "-d")
-        pb.directory(service.filesDir)
-        pb.redirectErrorStream(true)
-        val p = pb.start()
-        processes.add(p)
-        Log.i("HysteriaModule: Started pdnsd for Tun2Socks DNS at 127.0.0.1:1053")
-        return true
+        return runCatching {
+            val pb = ProcessBuilder(pdnsd.absolutePath, "-c", conf.absolutePath, "-d")
+            pb.directory(service.filesDir)
+            pb.redirectErrorStream(true)
+            val p = pb.start()
+            processes.add(p)
+            Log.i("HysteriaModule: Started pdnsd for Tun2Socks DNS at 127.0.0.1:1053 with upstreams=$upstreams")
+            true
+        }.getOrElse {
+            Log.w("HysteriaModule: Failed to start pdnsd (${it.message}), fallback to Clash DNS")
+            false
+        }
     }
+
+    private fun parseUpstreamDnsServers(yamlTemplate: String): List<String> {
+        val lines = yamlTemplate.lines()
+        val servers = mutableListOf<String>()
+        var inDnsBlock = false
+        var dnsIndent = 0
+        var inNameServer = false
+        var nameServerIndent = 0
+
+        for (raw in lines) {
+            val line = raw.substringBefore('#').trimEnd()
+            if (line.isBlank()) continue
+
+            val indent = raw.indexOfFirst { !it.isWhitespace() }.coerceAtLeast(0)
+            val trimmed = line.trimStart()
+
+            if (!inDnsBlock) {
+                if (trimmed == "dns:") {
+                    inDnsBlock = true
+                    dnsIndent = indent
+                }
+                continue
+            }
+
+            if (indent <= dnsIndent) {
+                break
+            }
+
+            if (!inNameServer) {
+                if (trimmed == "nameserver:" || trimmed == "default-nameserver:") {
+                    inNameServer = true
+                    nameServerIndent = indent
+                }
+                continue
+            }
+
+            if (indent <= nameServerIndent) {
+                inNameServer = false
+                if (trimmed == "nameserver:" || trimmed == "default-nameserver:") {
+                    inNameServer = true
+                    nameServerIndent = indent
+                }
+                continue
+            }
+
+            if (trimmed.startsWith("-")) {
+                val value = trimmed.removePrefix("-").trim().trim('"', ''')
+                val host = value.substringBefore(':').substringAfter("https://").substringAfter("tls://")
+                val normalized = host.substringBefore('/').trim()
+                val ip = runCatching { InetAddress.getByName(normalized) }.getOrNull()
+                if (ip is Inet4Address) {
+                    servers.add(ip.hostAddress ?: normalized)
+                }
+            }
+        }
+
+        return servers.distinct()
+    }
+
 
     private fun isLoopbackHostPort(value: String): Boolean {
         val host = value.substringBefore(':', "").lowercase()
