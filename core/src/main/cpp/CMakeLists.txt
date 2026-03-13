@@ -143,3 +143,9 @@ set(TUN2SOCKS_SOURCES
 
 add_library(bridge SHARED main.c jni_helper.c bridge_helper.c ${TUN2SOCKS_SOURCES})
 target_link_libraries(bridge log clash)
+
+
+# --- pdnsd executable (xsocks-android-ref parity) ---
+file(GLOB PDNSD_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/pdnsd/src/*.c")
+add_executable(pdnsd ${PDNSD_SOURCES})
+target_include_directories(pdnsd PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/pdnsd)

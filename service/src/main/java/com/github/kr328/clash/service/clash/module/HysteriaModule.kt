@@ -26,12 +26,14 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         var socksPort: Int = 0
         var udpgwServer: String = ""
         var dnsGateway: String = "127.0.0.1:1053"
+        var usePdnsd: Boolean = false
 
         fun requestStop() {
             useTun2Socks = false
             socksPort = 0
             udpgwServer = ""
             dnsGateway = "127.0.0.1:1053"
+            usePdnsd = false
         }
     }
 
@@ -78,7 +80,12 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             }
 
             dnsGateway = parseDnsGateway(config.yamlTemplate)
-            Log.i("HysteriaModule: Tun2Socks Core C enabled (SOCKS 127.0.0.1:$socksPort, UDPGW: ${if (udpgwServer.isBlank()) "disabled" else udpgwServer}, DNSGW: $dnsGateway)")
+            usePdnsd = startPdnsdIfAvailable(runtimeAccounts[0])
+            if (usePdnsd) {
+                dnsGateway = "127.0.0.1:1053"
+            }
+
+            Log.i("HysteriaModule: Tun2Socks Core C enabled (SOCKS 127.0.0.1:$socksPort, UDPGW: ${if (udpgwServer.isBlank()) "disabled" else udpgwServer}, DNSGW: $dnsGateway, PDNSD: ${if (usePdnsd) "enabled" else "disabled"})")
         }
 
         try {
@@ -212,6 +219,49 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
 
 
 
+
+    private fun startPdnsdIfAvailable(account: HysteriaAccount): Boolean {
+        val pdnsd = File(service.applicationInfo.nativeLibraryDir, "pdnsd")
+        if (!pdnsd.exists()) {
+            Log.w("HysteriaModule: pdnsd executable not found, fallback to Clash DNS")
+            return false
+        }
+
+        val conf = File(service.filesDir, "pdnsd.conf")
+        val cacheDir = File(service.filesDir, "pdnsd-cache").apply { mkdirs() }
+        conf.writeText(
+            """
+            global {
+              perm_cache=1024;
+              cache_dir="${cacheDir.absolutePath}";
+              server_port=1053;
+              server_ip=127.0.0.1;
+              status_ctl=off;
+              query_method=tcp_only;
+              min_ttl=15m;
+              max_ttl=1w;
+              timeout=10;
+              daemon=off;
+            }
+            server {
+              label="remote";
+              ip=${account.serverIp};
+              port=53;
+              uptest=none;
+            }
+            rr { name=localhost; reverse=on; a=127.0.0.1; owner=localhost; soa=localhost,root.localhost,42,86400,900,86400,86400; }
+            """.trimIndent()
+        )
+
+        val pb = ProcessBuilder(pdnsd.absolutePath, "-c", conf.absolutePath, "-d")
+        pb.directory(service.filesDir)
+        pb.redirectErrorStream(true)
+        val p = pb.start()
+        processes.add(p)
+        Log.i("HysteriaModule: Started pdnsd for Tun2Socks DNS at 127.0.0.1:1053")
+        return true
+    }
+
     private fun isLoopbackHostPort(value: String): Boolean {
         val host = value.substringBefore(':', "").lowercase()
         return host == "127.0.0.1" || host == "localhost"
@@ -256,7 +306,7 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         }
 
         try {
-            val killCommand = "pkill -9 libuz; pkill -9 libload; pkill -f libuz.so; pkill -f libload.so"
+            val killCommand = "pkill -9 libuz; pkill -9 libload; pkill -9 pdnsd; pkill -f libuz.so; pkill -f libload.so; pkill -f pdnsd"
             Runtime.getRuntime().exec(arrayOf("sh", "-c", killCommand)).waitFor()
         } catch (e: Exception) {
             // Ignore
