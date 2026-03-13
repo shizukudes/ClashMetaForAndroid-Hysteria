@@ -212,7 +212,7 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun2Socks(JNIEnv *env,
     int argc = sizeof(base_argv) / sizeof(base_argv[0]);
     int enable_udpgw = udpgw != NULL && strlen(udpgw) > 0;
     if (enable_udpgw) {
-        argc += 2;
+        argc += 3;
     }
 
     char **argv = malloc(sizeof(char *) * (argc + 1));
@@ -235,6 +235,7 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun2Socks(JNIEnv *env,
     if (enable_udpgw) {
         argv[index++] = strdup("--udpgw-remote-server-addr");
         argv[index++] = strdup(udpgw);
+        argv[index++] = strdup("--udpgw-transparent-dns");
     }
 
     argv[index] = NULL;
