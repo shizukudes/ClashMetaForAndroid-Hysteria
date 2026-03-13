@@ -11,6 +11,9 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
 import java.io.File
+import java.net.Inet4Address
+import java.net.InetAddress
+import java.net.ServerSocket
 import java.util.concurrent.TimeUnit
 
 class HysteriaModule(service: Service) : Module<Unit>(service) {
@@ -22,9 +25,13 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         var useTun2Socks: Boolean = false
         var socksPort: Int = 0
         var udpgwServer: String = ""
+        var dnsGateway: String = "127.0.0.1:1053"
 
         fun requestStop() {
             useTun2Socks = false
+            socksPort = 0
+            udpgwServer = ""
+            dnsGateway = "127.0.0.1:1053"
         }
     }
 
@@ -33,7 +40,7 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         val configFile = service.importedDir.resolve(activeUuid.toString()).resolve("hysteria.json")
         
         // Reset state
-        useTun2Socks = false
+        requestStop()
 
         if (!configFile.exists()) {
             Log.i("HysteriaModule: No hysteria.json found for profile $activeUuid")
@@ -57,12 +64,10 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
 
         if (runtimeAccounts.isNotEmpty() && runtimeAccounts[0].tunCore == "Tun2Socks") {
             useTun2Socks = true
-            socksPort = 20080
-            udpgwServer = runtimeAccounts[0].udpgwServer
-            Log.i("HysteriaModule: Tun2Socks Core C enabled (SOCKS 127.0.0.1:$socksPort, UDPGW: $udpgwServer)")
-            
-            // Override the localPort for LoadBalancer to match Tun2Socks expectations
-            config.localPort = socksPort
+            socksPort = config.localPort
+            udpgwServer = if (config.udpForwarding) runtimeAccounts[0].udpgwServer.trim().ifBlank { "127.0.0.1:7300" } else ""
+            dnsGateway = parseDnsGateway(config.yamlTemplate)
+            Log.i("HysteriaModule: Tun2Socks Core C enabled (SOCKS 127.0.0.1:$socksPort, UDPGW: ${if (udpgwServer.isBlank()) "disabled" else udpgwServer}, DNSGW: $dnsGateway)")
         }
 
         try {
@@ -94,11 +99,11 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             else -> "info"
         }
 
-        var currentPort = 2081
+        val usedPorts = mutableSetOf(config.localPort)
         enabledAccounts.forEach { account ->
             // Spawn 3 instances per account for better load balancing
             repeat(3) { i ->
-                val port = currentPort++
+                val port = reserveFreePort(usedPorts)
 
                 val hyConfig = JSONObject().apply {
                     put("server", "${account.serverIp}:${account.serverPortRange}")
@@ -140,6 +145,73 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         Log.i("HysteriaModule: Starting LoadBalancer on port ${config.localPort}")
         val lbProcess = lbPb.start()
         processes.add(lbProcess)
+    }
+
+    private fun parseDnsGateway(yamlTemplate: String): String {
+        val lines = yamlTemplate.lines()
+        var inDnsBlock = false
+        var dnsIndent = 0
+
+        for (raw in lines) {
+            val line = raw.substringBefore('#').trimEnd()
+            if (line.isBlank()) continue
+
+            val indent = raw.indexOfFirst { !it.isWhitespace() }.coerceAtLeast(0)
+            val trimmed = line.trimStart()
+
+            if (!inDnsBlock) {
+                if (trimmed == "dns:") {
+                    inDnsBlock = true
+                    dnsIndent = indent
+                }
+                continue
+            }
+
+            if (indent <= dnsIndent) {
+                break
+            }
+
+            if (trimmed.startsWith("listen:")) {
+                val value = trimmed.removePrefix("listen:").trim().trim('"', '\'')
+                if (isValidTun2SocksDnsGateway(value)) {
+                    return value
+                }
+
+                if (value.isNotBlank()) {
+                    Log.w("HysteriaModule: Unsupported dns.listen for Tun2Socks ($value), fallback to 127.0.0.1:1053")
+                }
+            }
+        }
+
+        return "127.0.0.1:1053"
+    }
+
+    private fun isValidTun2SocksDnsGateway(value: String): Boolean {
+        val host = value.substringBefore(':', "")
+        val port = value.substringAfter(':', "")
+
+        if (host.isBlank() || port.isBlank()) return false
+
+        val portInt = port.toIntOrNull() ?: return false
+        if (portInt !in 1..65535) return false
+
+        val ip = runCatching { InetAddress.getByName(host) }.getOrNull() ?: return false
+        return ip is Inet4Address
+    }
+
+    private fun reserveFreePort(usedPorts: MutableSet<Int>): Int {
+        repeat(64) {
+            val candidate = ServerSocket(0).use { it.localPort }
+            if (candidate !in usedPorts) {
+                usedPorts.add(candidate)
+                return candidate
+            }
+        }
+
+        var fallback = 20000
+        while (fallback in usedPorts) fallback++
+        usedPorts.add(fallback)
+        return fallback
     }
 
     private fun stopCores() {
