@@ -85,7 +85,7 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
                 Log.w("HysteriaModule: UDP forwarding enabled but no valid remote UDPGW endpoint configured; continuing with UDPGW disabled")
             }
 
-            usePdnsd = startPdnsdIfAvailable(config)
+            usePdnsd = config.tun2SocksUsePdnsd && startPdnsdIfAvailable(config)
             dnsGateway = if (usePdnsd) {
                 // Tun2Socks --dnsgw must point to local pdnsd when pdnsd is available.
                 "127.0.0.1:${config.pdnsdListenPort}"

@@ -314,9 +314,12 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
                     val udpgw = activeAccount.udpgwServer.trim().takeIf {
                         it.isNotBlank() && isValidHostPort(it) && !isLoopbackHostPort(it)
                     } ?: ""
-                    // Always point Tun2Socks DNS gateway to local pdnsd endpoint.
-                    // HysteriaModule will start pdnsd when available and fallback if unavailable.
-                    val dnsGateway = "127.0.0.1:${config.pdnsdListenPort}"
+                    val pdnsdAvailable = java.io.File(applicationInfo.nativeLibraryDir, "pdnsd").exists()
+                    val dnsGateway = if (config.tun2SocksUsePdnsd && pdnsdAvailable) {
+                        "127.0.0.1:${config.pdnsdListenPort}"
+                    } else {
+                        config.tun2SocksDnsGateway.trim().takeIf { isValidHostPort(it) } ?: "127.0.0.1:1053"
+                    }
 
                     Tun2SocksBootstrap(
                         socksPort = socksPort,
