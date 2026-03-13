@@ -85,10 +85,12 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
                 Log.w("HysteriaModule: UDP forwarding enabled but no valid remote UDPGW endpoint configured; continuing with UDPGW disabled")
             }
 
-            dnsGateway = config.tun2SocksDnsGateway.trim().ifBlank { parseDnsGateway(config.yamlTemplate) }
             usePdnsd = config.tun2SocksUsePdnsd && startPdnsdIfAvailable(config)
-            if (usePdnsd) {
-                dnsGateway = "127.0.0.1:${config.pdnsdListenPort}"
+            dnsGateway = if (usePdnsd) {
+                // Tun2Socks --dnsgw must point to local pdnsd when pdnsd is enabled.
+                "127.0.0.1:${config.pdnsdListenPort}"
+            } else {
+                config.tun2SocksDnsGateway.trim().ifBlank { parseDnsGateway(config.yamlTemplate) }
             }
 
             Log.i("HysteriaModule: Tun2Socks Core C enabled (SOCKS 127.0.0.1:$socksPort, UDPGW: ${if (udpgwServer.isBlank()) "disabled" else udpgwServer}, DNSGW: $dnsGateway, PDNSD: ${if (usePdnsd) "enabled" else "disabled"})")
@@ -281,7 +283,8 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         )
 
         return runCatching {
-            val pb = ProcessBuilder(pdnsd.absolutePath, "-c", conf.absolutePath, "-d")
+            // Run in foreground mode so service process lifecycle can manage pdnsd directly.
+            val pb = ProcessBuilder(pdnsd.absolutePath, "-4", "--nodaemon", "-c", conf.absolutePath)
             pb.directory(service.filesDir)
             pb.redirectErrorStream(true)
             val p = pb.start()
