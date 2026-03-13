@@ -143,7 +143,7 @@ set(TUN2SOCKS_SOURCES
 
 add_library(bridge SHARED main.c jni_helper.c bridge_helper.c ${TUN2SOCKS_SOURCES})
 # badvpn upstream emits several warnings on modern clang; keep native build stable across NDK updates.
-target_compile_options(bridge PRIVATE -Wno-parentheses -Wno-unused-value -Wno-pointer-sign)
+target_compile_options(bridge PRIVATE -Wno-parentheses -Wno-unused-value -Wno-pointer-sign -Wno-address-of-packed-member)
 target_link_libraries(bridge log clash)
 
 

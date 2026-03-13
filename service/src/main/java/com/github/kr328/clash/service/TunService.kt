@@ -12,13 +12,16 @@ import com.github.kr328.clash.common.log.Log
 import com.github.kr328.clash.service.clash.clashRuntime
 import com.github.kr328.clash.service.clash.module.*
 import com.github.kr328.clash.service.model.AccessControlMode
+import com.github.kr328.clash.service.model.HysteriaConfig
 import com.github.kr328.clash.service.store.ServiceStore
 import com.github.kr328.clash.service.util.cancelAndJoinBlocking
+import com.github.kr328.clash.service.util.importedDir
 import com.github.kr328.clash.service.util.parseCIDR
 import com.github.kr328.clash.service.util.sendClashStarted
 import com.github.kr328.clash.service.util.sendClashStopped
 import kotlinx.coroutines.*
 import kotlinx.coroutines.selects.select
+import kotlinx.serialization.json.Json
 
 class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.Default) {
     private val self: TunService
@@ -28,10 +31,16 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
 
     private val runtime = clashRuntime {
         val store = ServiceStore(self)
+        val tun2SocksMode = detectTun2SocksMode(store)
+
+        if (tun2SocksMode) {
+            HysteriaModule.runClashTun = false
+            Log.i("TunService: Tun2Socks mode detected, skipping Clash configuration module")
+        }
 
         val close = install(CloseModule(self))
         val tun = install(TunModule(self))
-        val config = install(ConfigurationModule(self))
+        val config = if (tun2SocksMode) null else install(ConfigurationModule(self))
         val network = install(NetworkObserveModule(self))
         install(HysteriaModule(self))
 
@@ -52,7 +61,7 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
                     close.onEvent {
                         true
                     }
-                    config.onEvent {
+                    config?.onEvent {
                         reason = it.message
 
                         true
@@ -261,6 +270,29 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
             attach(device)
         } else {
             throw IllegalStateException("No tunnel core selected")
+        }
+    }
+
+    private fun detectTun2SocksMode(store: ServiceStore): Boolean {
+        val active = store.activeProfile ?: return false
+        val configFile = importedDir.resolve(active.toString()).resolve("hysteria.json")
+        if (!configFile.exists()) return false
+
+        return runCatching {
+            val config = Json { ignoreUnknownKeys = true }
+                .decodeFromString(HysteriaConfig.serializer(), configFile.readText())
+            val enabledAccounts = config.accounts.filter { it.enabled }
+            if (!config.enabled || enabledAccounts.isEmpty()) {
+                false
+            } else {
+                val activeAccount = config.activeAccountId
+                    ?.let { activeId -> enabledAccounts.firstOrNull { it.id == activeId } }
+                    ?: enabledAccounts.firstOrNull()
+                activeAccount?.tunCore == "Tun2Socks"
+            }
+        }.getOrElse {
+            Log.w("TunService: Failed to detect Tun2Socks mode (${it.message})")
+            false
         }
     }
 
