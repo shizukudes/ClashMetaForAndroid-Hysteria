@@ -182,7 +182,7 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeStartTun2Socks(JNIEnv *env,
     const char *udpgw = (*env)->GetStringUTFChars(env, udpgwServer, 0);
     const char *dns = (*env)->GetStringUTFChars(env, dnsServer, 0);
 
-    if (!socks || !udpgw || !dns) {
+    if (!socks || !udpgw || !dns || strlen(socks) == 0 || strlen(dns) == 0) {
         pthread_mutex_lock(&tun2socks_lock);
         close_tun2socks_fd_locked();
         pthread_mutex_unlock(&tun2socks_lock);

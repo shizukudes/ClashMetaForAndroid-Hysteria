@@ -65,7 +65,7 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         if (runtimeAccounts.isNotEmpty() && runtimeAccounts[0].tunCore == "Tun2Socks") {
             useTun2Socks = true
             socksPort = config.localPort
-            udpgwServer = if (config.udpForwarding) runtimeAccounts[0].udpgwServer.trim() else ""
+            udpgwServer = if (config.udpForwarding) runtimeAccounts[0].udpgwServer.trim().ifBlank { "127.0.0.1:7300" } else ""
             dnsGateway = parseDnsGateway(config.yamlTemplate)
             Log.i("HysteriaModule: Tun2Socks Core C enabled (SOCKS 127.0.0.1:$socksPort, UDPGW: ${if (udpgwServer.isBlank()) "disabled" else udpgwServer}, DNSGW: $dnsGateway)")
         }
