@@ -66,6 +66,11 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             useTun2Socks = true
             socksPort = config.localPort
             udpgwServer = if (config.udpForwarding) runtimeAccounts[0].udpgwServer.trim() else ""
+            if (config.udpForwarding && (udpgwServer.isBlank() || isLoopbackHostPort(udpgwServer))) {
+                udpgwServer = "${runtimeAccounts[0].serverIp}:${config.udpgwPort}"
+                Log.i("HysteriaModule: Using derived remote UDPGW endpoint $udpgwServer")
+            }
+
             if (udpgwServer.isNotBlank() && !isValidHostPort(udpgwServer)) {
                 Log.w("HysteriaModule: Invalid udpgw server '$udpgwServer', disabling UDPGW")
                 udpgwServer = ""
@@ -204,6 +209,12 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         return ip is Inet4Address
     }
 
+
+
+    private fun isLoopbackHostPort(value: String): Boolean {
+        val host = value.substringBefore(':', "").lowercase()
+        return host == "127.0.0.1" || host == "localhost"
+    }
 
     private fun isValidHostPort(value: String): Boolean {
         val host = value.substringBefore(':', "")
