@@ -71,15 +71,18 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             runClashTun = false
             socksPort = config.localPort
             udpgwServer = if (config.udpForwarding) runtimeAccounts[0].udpgwServer.trim() else ""
-            if (config.udpForwarding && (udpgwServer.isBlank() || isLoopbackHostPort(udpgwServer))) {
-                val derivedPort = udpgwServer.substringAfter(':', "").toIntOrNull() ?: config.udpgwPort
-                udpgwServer = "${runtimeAccounts[0].serverIp}:$derivedPort"
-                Log.i("HysteriaModule: Using derived remote UDPGW endpoint $udpgwServer")
-            }
-
             if (udpgwServer.isNotBlank() && !isValidHostPort(udpgwServer)) {
                 Log.w("HysteriaModule: Invalid udpgw server '$udpgwServer', disabling UDPGW")
                 udpgwServer = ""
+            }
+
+            if (config.udpForwarding && isLoopbackHostPort(udpgwServer)) {
+                Log.w("HysteriaModule: Loopback UDPGW endpoint '$udpgwServer' is not supported for Tun2Socks remote forwarding, disabling UDPGW")
+                udpgwServer = ""
+            }
+
+            if (config.udpForwarding && udpgwServer.isBlank()) {
+                Log.w("HysteriaModule: UDP forwarding enabled but no valid remote UDPGW endpoint configured; continuing with UDPGW disabled")
             }
 
             dnsGateway = config.tun2SocksDnsGateway.trim().ifBlank { parseDnsGateway(config.yamlTemplate) }
