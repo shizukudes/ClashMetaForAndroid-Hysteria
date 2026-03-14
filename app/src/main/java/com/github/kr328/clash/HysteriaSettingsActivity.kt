@@ -21,6 +21,7 @@ import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.net.URI
 import java.util.UUID
 
 class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
@@ -293,9 +294,10 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
             throw IllegalArgumentException("Account name cannot be empty")
         }
 
-        if (account.serverIp.isBlank()) {
-            throw IllegalArgumentException("Server IP/host cannot be empty for account ${account.name}")
-        }
+        val normalizedHost = parseServerHost(account.serverIp)
+            ?: throw IllegalArgumentException("Server IP/host cannot be empty for account ${account.name}")
+
+        account.serverIp = normalizedHost
 
         val match = PORT_RANGE_REGEX.matchEntire(account.serverPortRange.trim())
             ?: throw IllegalArgumentException("Invalid server port/range for account ${account.name}")
@@ -308,6 +310,33 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
         }
 
         account.serverPortRange = if (from == to) "$from" else "$from-$to"
+    }
+
+    private fun parseServerHost(raw: String): String? {
+        val input = raw.trim()
+        if (input.isEmpty()) return null
+
+        if (input.contains("://")) {
+            val uri = runCatching { URI(input) }.getOrNull()
+                ?: throw IllegalArgumentException("Invalid server address: $raw")
+            return uri.host?.trim()?.takeIf { it.isNotEmpty() }
+                ?: throw IllegalArgumentException("Invalid server address: $raw")
+        }
+
+        val bracketed = BRACKETED_HOST_REGEX.matchEntire(input)
+        if (bracketed != null) {
+            return bracketed.groupValues[1].trim().takeIf { it.isNotEmpty() }
+        }
+
+        if (input.count { it == ':' } == 1) {
+            val maybeHost = input.substringBefore(':').trim()
+            val maybePort = input.substringAfter(':').trim()
+            if (maybeHost.isNotEmpty() && maybePort.toIntOrNull() in 1..65535) {
+                return maybeHost
+            }
+        }
+
+        return input
     }
 
     private fun defaultTemplate(localPort: Int): String {
@@ -338,6 +367,7 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
                 type: socks5
                 server: 127.0.0.1
                 port: $localPort
+                udp: true
             
             proxy-groups:
               - name: "Proxy"
@@ -352,29 +382,47 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
     }
 
     private fun upsertHysteriaProxy(yaml: String, localPort: Int): String {
-        val nameRegex = Regex("""(?m)^\s*-\s*name:\s*["']?Hysteria-LB["']?\s*$""")
-        val blockStart = nameRegex.find(yaml)
+        val proxiesHeader = PROXIES_HEADER_REGEX.find(yaml)
+        val proxyEntry = "  - name: \"Hysteria-LB\"\n    type: socks5\n    server: 127.0.0.1\n    port: $localPort\n    udp: true"
 
-        if (blockStart != null) {
-            val nextName = Regex("""(?m)^\s*-\s*name:\s*""")
-                .find(yaml, blockStart.range.last + 1)
-            val blockEndExclusive = nextName?.range?.first ?: yaml.length
-            val block = yaml.substring(blockStart.range.first, blockEndExclusive)
-            val patchedBlock = if (PORT_LINE_REGEX.containsMatchIn(block)) {
+        if (proxiesHeader == null) {
+            return "$yaml\n\nproxies:\n$proxyEntry\n"
+        }
+
+        val proxiesBodyStart = proxiesHeader.range.last + 1
+        val sectionTail = SECTION_HEADER_REGEX.find(yaml, proxiesBodyStart)
+        val proxiesBodyEnd = sectionTail?.range?.first ?: yaml.length
+        val proxiesBody = yaml.substring(proxiesBodyStart, proxiesBodyEnd)
+
+        val proxyBlockStart = HYSTERIA_LB_REGEX.find(proxiesBody)
+
+        if (proxyBlockStart != null) {
+            val nextProxy = Regex("""(?m)^\s{2}-\s*name:\s*""")
+                .find(proxiesBody, proxyBlockStart.range.last + 1)
+            val blockEndExclusive = nextProxy?.range?.first ?: proxiesBody.length
+            val block = proxiesBody.substring(proxyBlockStart.range.first, blockEndExclusive)
+            val withPatchedPort = if (PORT_LINE_REGEX.containsMatchIn(block)) {
                 block.replaceFirst(PORT_LINE_REGEX, "$1$localPort")
             } else {
-                "$block\n    port: $localPort"
+                "${block.trimEnd()}\n    port: $localPort\n"
             }
 
-            return yaml.substring(0, blockStart.range.first) + patchedBlock + yaml.substring(blockEndExclusive)
+            val patchedBlock = if (UDP_LINE_REGEX.containsMatchIn(withPatchedPort)) {
+                withPatchedPort.replaceFirst(UDP_LINE_REGEX, "$1true")
+            } else {
+                "${withPatchedPort.trimEnd()}\n    udp: true\n"
+            }
+
+            val patchedBody = proxiesBody.substring(0, proxyBlockStart.range.first) +
+                patchedBlock +
+                proxiesBody.substring(blockEndExclusive)
+
+            return yaml.substring(0, proxiesBodyStart) + patchedBody + yaml.substring(proxiesBodyEnd)
         }
 
-        val proxyEntry = "  - name: \"Hysteria-LB\"\n    type: socks5\n    server: 127.0.0.1\n    port: $localPort"
-        return if (PROXIES_HEADER_REGEX.containsMatchIn(yaml)) {
-            yaml.replaceFirst(PROXIES_HEADER_REGEX, "proxies:\n$proxyEntry")
-        } else {
-            "$yaml\n\nproxies:\n$proxyEntry\n"
-        }
+        val separator = if (proxiesBody.isNotBlank() && !proxiesBody.endsWith("\n")) "\n" else ""
+        val patchedBody = "$proxyEntry\n$separator$proxiesBody"
+        return yaml.substring(0, proxiesBodyStart) + patchedBody + yaml.substring(proxiesBodyEnd)
     }
 
     private fun injectHysteriaMeta(yaml: String, activeAccount: HysteriaAccount?): String {
@@ -390,8 +438,11 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
 
     companion object {
         private val PORT_RANGE_REGEX = Regex("""^(\d{1,5})(?:-(\d{1,5}))?$""")
+        private val BRACKETED_HOST_REGEX = Regex("""^\[([^\]]+)](?::(\d{1,5}))?$""")
         private val PORT_LINE_REGEX = Regex("""(?m)^(\s*port:\s*)\d+\s*$""")
+        private val UDP_LINE_REGEX = Regex("""(?m)^(\s*udp:\s*)(?:true|false)\s*$""")
         private val PROXIES_HEADER_REGEX = Regex("""(?m)^proxies:\s*$""")
-        private val HYSTERIA_LB_REGEX = Regex("""(?m)^\s*-\s*name:\s*["']?Hysteria-LB["']?\s*$""")
+        private val SECTION_HEADER_REGEX = Regex("""(?m)^[a-zA-Z0-9_-]+:\s*$""")
+        private val HYSTERIA_LB_REGEX = Regex("""(?m)^\s{2}-\s*name:\s*["']?Hysteria-LB["']?\s*$""")
     }
 }

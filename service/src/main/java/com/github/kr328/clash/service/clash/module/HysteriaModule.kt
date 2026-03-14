@@ -79,9 +79,10 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
 
         enabledAccounts.forEachIndexed { index, account ->
             val port = 20080 + index
+            val serverHost = normalizeServerHost(account.serverIp)
 
             val hyConfig = JSONObject().apply {
-                put("server", "${account.serverIp}:${account.serverPortRange}")
+                put("server", "$serverHost:${account.serverPortRange}")
                 put("obfs", account.obfs)
                 put("auth", account.password)
                 put("loglevel", hyLogLevel)
@@ -119,6 +120,16 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
         Log.i("HysteriaModule: Starting LoadBalancer on port ${config.localPort}")
         val lbProcess = lbPb.start()
         processes.add(lbProcess)
+    }
+
+
+    private fun normalizeServerHost(raw: String): String {
+        val host = raw.trim().removePrefix("[").removeSuffix("]")
+        if (host.count { it == ':' } > 1) {
+            return "[$host]"
+        }
+
+        return host
     }
 
     private fun stopCores() {
