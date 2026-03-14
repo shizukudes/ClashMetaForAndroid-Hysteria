@@ -38,7 +38,11 @@ class HysteriaSettingsActivity : BaseActivity<HysteriaSettingsDesign>() {
             sStore.activeProfile = activeUuid
         }
 
-        val configFile = importedDir.resolve(activeUuid.toString()).resolve("hysteria.json")
+        val profileId = activeUuid.toString()
+        val configFile = importedDir.resolve(profileId).resolve("hysteria.json")
+            .takeIf { it.exists() }
+            ?: pendingDir.resolve(profileId).resolve("hysteria.json")
+
         val config = if (configFile.exists()) {
             try {
                 json.decodeFromString(HysteriaConfig.serializer(), configFile.readText())
