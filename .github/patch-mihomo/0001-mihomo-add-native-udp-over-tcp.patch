@@ -1,5 +1,5 @@
 diff --git a/adapter/outbound/socks5.go b/adapter/outbound/socks5.go
-index f27f6de8..e7a627c3 100644
+index f27f6de8..8da51646 100644
 --- a/adapter/outbound/socks5.go
 +++ b/adapter/outbound/socks5.go
 @@ -2,12 +2,14 @@ package outbound
@@ -33,27 +33,73 @@ index f27f6de8..e7a627c3 100644
  	SkipCertVerify bool   `proxy:"skip-cert-verify,omitempty"`
  	Fingerprint    string `proxy:"fingerprint,omitempty"`
  	Certificate    string `proxy:"certificate,omitempty"`
-@@ -90,6 +94,19 @@ func (ss *Socks5) ListenPacketContext(ctx context.Context, metadata *C.Metadata)
+@@ -90,6 +94,65 @@ func (ss *Socks5) ListenPacketContext(ctx context.Context, metadata *C.Metadata)
  	if err = ss.ResolveUDP(ctx, metadata); err != nil {
  		return nil, err
  	}
 +
 +	if ss.udpOverTCP != "" {
-+		// Connect to the UDP-GW server (e.g. 127.0.0.1:7300)
-+		c, err := ss.dialer.DialContext(ctx, "tcp", ss.udpOverTCP)
++		// Connect to the proxy server (e.g. 127.0.0.1:7777)
++		// We always connect to ss.addr because libload is the only one listening
++		c, err := ss.dialer.DialContext(ctx, "tcp", ss.addr)
 +		if err != nil {
-+			return nil, fmt.Errorf("udpgw %s connect error: %w", ss.udpOverTCP, err)
++			return nil, fmt.Errorf("udpgw connect error: %w", err)
 +		}
 +
-+		// BadVPN UDP-GW usually doesn't need SOCKS5 handshake if it's a direct gateway.
-+		// However, we still wrap it in our PacketConn logic.
++		if ss.tls {
++			cc := tls.Client(c, ss.tlsConfig)
++			ctx, cancel := context.WithTimeout(context.Background(), C.DefaultTLSTimeout)
++			defer cancel()
++			err = cc.HandshakeContext(ctx)
++			c = cc
++			if err != nil {
++				c.Close()
++				return nil, err
++			}
++		}
++
++		var user *socks5.User
++		if ss.user != "" {
++			user = &socks5.User{
++				Username: ss.user,
++				Password: ss.pass,
++			}
++		}
++
++		// PARSE TARGET UDP-GW DARI KONFIGURASI YAML (contoh: 127.0.0.1:7300)
++		host, portStr, err := net.SplitHostPort(ss.udpOverTCP)
++		var udpGwTarget socks5.Addr
++		if err == nil {
++			port, _ := strconv.Atoi(portStr)
++			ip := net.ParseIP(host)
++			if ip != nil {
++				// SOCKS5 Address: [ATYP(1)] [IPv4(4)] [PORT(2)]
++				udpGwTarget = make([]byte, 7)
++				udpGwTarget[0] = socks5.AtypIPv4
++				copy(udpGwTarget[1:5], ip.To4())
++				binary.BigEndian.PutUint16(udpGwTarget[5:7], uint16(port))
++			}
++		}
++
++		// Jika gagal parse, gunakan metadata aslinya (walaupun untuk BadVPN ini salah sasaran)
++		if udpGwTarget == nil {
++			udpGwTarget = socks5.ParseAddrToSocksAddr(metadata.RemoteAddress())
++		}
++
++		// LAKUKAN SOCKS5 CONNECT HANDSHAKE KE ALAMAT 7300 MELEWATI LIBLOAD
++		// Ini KUNCI agar libload meneruskan stream TCP kita ke server Hysteria port 7300
++		if _, err := ss.clientHandshakeContext(ctx, c, udpGwTarget, socks5.CmdConnect, user); err != nil {
++			c.Close()
++			return nil, fmt.Errorf("udpgw socks handshake error: %w", err)
++		}
++
 +		return newPacketConn(&udpOverTCPPacketConn{Conn: c}, ss), nil
 +	}
 +
  	c, err := ss.dialer.DialContext(ctx, "tcp", ss.addr)
  	if err != nil {
  		err = fmt.Errorf("%s connect error: %w", ss.addr, err)
-@@ -205,6 +222,7 @@ func NewSocks5(option Socks5Option) (*Socks5, error) {
+@@ -205,6 +268,7 @@ func NewSocks5(option Socks5Option) (*Socks5, error) {
  		tls:            option.TLS,
  		skipCertVerify: option.SkipCertVerify,
  		tlsConfig:      tlsConfig,
@@ -61,7 +107,7 @@ index f27f6de8..e7a627c3 100644
  	}
  	outbound.dialer = option.NewDialer(outbound.DialOptions())
  	return outbound, nil
-@@ -248,3 +266,118 @@ func (uc *socksPacketConn) Close() error {
+@@ -248,3 +312,118 @@ func (uc *socksPacketConn) Close() error {
  	uc.tcpConn.Close()
  	return uc.PacketConn.Close()
  }
