@@ -5,6 +5,7 @@ import com.github.kr328.kaidl.BinderInterface
 import java.util.*
 
 @BinderInterface
+@Suppress("DEPRECATION")
 interface IProfileManager {
     suspend fun create(type: Profile.Type, name: String, source: String = ""): UUID
     suspend fun clone(uuid: UUID): UUID
