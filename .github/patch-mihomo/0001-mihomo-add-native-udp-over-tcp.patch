@@ -1,5 +1,5 @@
 diff --git a/adapter/outbound/socks5.go b/adapter/outbound/socks5.go
-index f27f6de8..fd55fe84 100644
+index f27f6de8..e7a627c3 100644
 --- a/adapter/outbound/socks5.go
 +++ b/adapter/outbound/socks5.go
 @@ -2,12 +2,14 @@ package outbound
@@ -21,7 +21,7 @@ index f27f6de8..fd55fe84 100644
  	tls            bool
  	skipCertVerify bool
  	tlsConfig      *tls.Config
-+	udpOverTCP     bool
++	udpOverTCP     string // Now a string for the UDP-GW server address
  }
  
  type Socks5Option struct {
@@ -29,53 +29,31 @@ index f27f6de8..fd55fe84 100644
  	Password       string `proxy:"password,omitempty"`
  	TLS            bool   `proxy:"tls,omitempty"`
  	UDP            bool   `proxy:"udp,omitempty"`
-+	UDPOverTCP     bool   `proxy:"udp-over-tcp,omitempty"`
++	UDPOverTCP     string `proxy:"udp-over-tcp,omitempty"` // Change to string
  	SkipCertVerify bool   `proxy:"skip-cert-verify,omitempty"`
  	Fingerprint    string `proxy:"fingerprint,omitempty"`
  	Certificate    string `proxy:"certificate,omitempty"`
-@@ -90,6 +94,41 @@ func (ss *Socks5) ListenPacketContext(ctx context.Context, metadata *C.Metadata)
+@@ -90,6 +94,19 @@ func (ss *Socks5) ListenPacketContext(ctx context.Context, metadata *C.Metadata)
  	if err = ss.ResolveUDP(ctx, metadata); err != nil {
  		return nil, err
  	}
 +
-+	if ss.udpOverTCP {
-+		c, err := ss.dialer.DialContext(ctx, "tcp", ss.addr)
++	if ss.udpOverTCP != "" {
++		// Connect to the UDP-GW server (e.g. 127.0.0.1:7300)
++		c, err := ss.dialer.DialContext(ctx, "tcp", ss.udpOverTCP)
 +		if err != nil {
-+			return nil, fmt.Errorf("%s connect error: %w", ss.addr, err)
++			return nil, fmt.Errorf("udpgw %s connect error: %w", ss.udpOverTCP, err)
 +		}
 +
-+		if ss.tls {
-+			cc := tls.Client(c, ss.tlsConfig)
-+			ctx, cancel := context.WithTimeout(context.Background(), C.DefaultTLSTimeout)
-+			defer cancel()
-+			err = cc.HandshakeContext(ctx)
-+			c = cc
-+			if err != nil {
-+				c.Close()
-+				return nil, err
-+			}
-+		}
-+
-+		var user *socks5.User
-+		if ss.user != "" {
-+			user = &socks5.User{
-+				Username: ss.user,
-+				Password: ss.pass,
-+			}
-+		}
-+
-+		if _, err := ss.clientHandshakeContext(ctx, c, serializesSocksAddr(metadata), socks5.CmdConnect, user); err != nil {
-+			c.Close()
-+			return nil, err
-+		}
-+
++		// BadVPN UDP-GW usually doesn't need SOCKS5 handshake if it's a direct gateway.
++		// However, we still wrap it in our PacketConn logic.
 +		return newPacketConn(&udpOverTCPPacketConn{Conn: c}, ss), nil
 +	}
 +
  	c, err := ss.dialer.DialContext(ctx, "tcp", ss.addr)
  	if err != nil {
  		err = fmt.Errorf("%s connect error: %w", ss.addr, err)
-@@ -205,6 +244,7 @@ func NewSocks5(option Socks5Option) (*Socks5, error) {
+@@ -205,6 +222,7 @@ func NewSocks5(option Socks5Option) (*Socks5, error) {
  		tls:            option.TLS,
  		skipCertVerify: option.SkipCertVerify,
  		tlsConfig:      tlsConfig,
@@ -83,7 +61,7 @@ index f27f6de8..fd55fe84 100644
  	}
  	outbound.dialer = option.NewDialer(outbound.DialOptions())
  	return outbound, nil
-@@ -248,3 +288,64 @@ func (uc *socksPacketConn) Close() error {
+@@ -248,3 +266,118 @@ func (uc *socksPacketConn) Close() error {
  	uc.tcpConn.Close()
  	return uc.PacketConn.Close()
  }
@@ -93,43 +71,97 @@ index f27f6de8..fd55fe84 100644
 +}
 +
 +func (uc *udpOverTCPPacketConn) WriteTo(b []byte, addr net.Addr) (n int, err error) {
-+	packet, err := socks5.EncodeUDPPacket(socks5.ParseAddrToSocksAddr(addr), b)
-+	if err != nil {
-+		return
++	// Parse alamat SOCKS5 yang diberikan oleh router Clash
++	socksAddr := socks5.ParseAddrToSocksAddr(addr)
++	if len(socksAddr) < 4 {
++		return 0, errors.New("invalid socks addr length")
 +	}
 +
-+	header := make([]byte, 2)
-+	binary.BigEndian.PutUint16(header, uint16(len(packet)))
-+	if _, err = uc.Conn.Write(header); err != nil {
++	var flags uint8 = 0
++	var udpgwAddr []byte
++
++	// 0x01 = IPv4, 0x04 = IPv6
++	if socksAddr[0] == 0x01 {
++		udpgwAddr = socksAddr[1:7] // 4 bytes IP + 2 bytes Port
++	} else if socksAddr[0] == 0x04 {
++		flags |= 0x08 // UDPGW_CLIENT_FLAG_IPV6
++		udpgwAddr = socksAddr[1:19] // 16 bytes IP + 2 bytes Port
++	} else {
++		return 0, errors.New("unsupported address type for udpgw")
++	}
++
++	// Buat udpgw_header (BadVPN protocol)
++	// 1 byte flags, 2 bytes conid (LittleEndian)
++	udpgwHeader := make([]byte, 3)
++	udpgwHeader[0] = flags
++	binary.LittleEndian.PutUint16(udpgwHeader[1:], 0) // conid = 0
++
++	// Kalkulasi PacketProto (BadVPN stream framing)
++	packetLen := len(udpgwHeader) + len(udpgwAddr) + len(b)
++	
++	// BadVPN selalu menggunakan LittleEndian untuk 2-byte panjang paket
++	lenHeader := make([]byte, 2)
++	binary.LittleEndian.PutUint16(lenHeader, uint16(packetLen))
++
++	// Tembakkan ke server 7300
++	if _, err = uc.Conn.Write(lenHeader); err != nil {
 +		return
 +	}
-+	n, err = uc.Conn.Write(packet)
++	if _, err = uc.Conn.Write(udpgwHeader); err != nil {
++		return
++	}
++	if _, err = uc.Conn.Write(udpgwAddr); err != nil {
++		return
++	}
++	n, err = uc.Conn.Write(b)
 +	return len(b), err
 +}
 +
 +func (uc *udpOverTCPPacketConn) ReadFrom(b []byte) (int, net.Addr, error) {
-+	header := make([]byte, 2)
-+	if _, err := io.ReadFull(uc.Conn, header); err != nil {
++	// Baca panjang dari PacketProto BadVPN (LittleEndian)
++	lenHeader := make([]byte, 2)
++	if _, err := io.ReadFull(uc.Conn, lenHeader); err != nil {
 +		return 0, nil, err
 +	}
++	packetLen := binary.LittleEndian.Uint16(lenHeader)
 +
-+	length := binary.BigEndian.Uint16(header)
-+	packet := make([]byte, length)
++	if packetLen < 3 {
++		return 0, nil, errors.New("udpgw packet too short")
++	}
++
++	packet := make([]byte, packetLen)
 +	if _, err := io.ReadFull(uc.Conn, packet); err != nil {
 +		return 0, nil, err
 +	}
 +
-+	addr, payload, err := socks5.DecodeUDPPacket(packet)
-+	if err != nil {
-+		return 0, nil, err
++	flags := packet[0]
++	// conid = packet[1:3] - tidak perlu dicek karena ini client
++	offset := 3
++
++	var ip net.IP
++	var port int
++
++	// Parse udpgw_addr_ipv6 vs udpgw_addr_ipv4
++	if (flags & 0x08) != 0 {
++		if len(packet) < offset+18 {
++			return 0, nil, errors.New("udpgw ipv6 packet truncated")
++		}
++		ip = net.IP(packet[offset : offset+16])
++		port = int(binary.BigEndian.Uint16(packet[offset+16 : offset+18]))
++		offset += 18
++	} else {
++		if len(packet) < offset+6 {
++			return 0, nil, errors.New("udpgw ipv4 packet truncated")
++		}
++		ip = net.IP(packet[offset : offset+4])
++		port = int(binary.BigEndian.Uint16(packet[offset+4 : offset+6]))
++		offset += 6
 +	}
 +
-+	udpAddr := addr.UDPAddr()
-+	if udpAddr == nil {
-+		return 0, nil, errors.New("parse udp addr error")
-+	}
-+
++	payload := packet[offset:]
 +	copy(b, payload)
++
++	udpAddr := &net.UDPAddr{IP: ip, Port: port}
 +	return len(payload), udpAddr, nil
 +}
 +
