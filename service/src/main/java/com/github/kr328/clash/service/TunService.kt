@@ -148,7 +148,41 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
                     addRoute(TUN_DNS6, 128)
                 }
             } else {
-                addRoute(NET_ANY, 0)
+                val activeUuid = store.activeProfile
+                var serverHost = ""
+                if (activeUuid != null) {
+                    val configFile = self.importedDir.resolve(activeUuid.toString()).resolve("hysteria.json")
+                    if (configFile.exists()) {
+                        try {
+                            val json = org.json.JSONObject(configFile.readText())
+                            val accounts = json.optJSONArray("accounts")
+                            if (accounts != null && accounts.length() > 0) {
+                                serverHost = accounts.getJSONObject(0).optString("server_ip", "")
+                            }
+                        } catch (e: Exception) {
+                            Log.w("TunService: Failed to parse hysteria.json for routing", e)
+                        }
+                    }
+                }
+
+                if (serverHost.isNotEmpty()) {
+                    try {
+                        val resolvedIp = java.net.InetAddress.getByName(serverHost).hostAddress ?: serverHost
+                        Log.i("TunService: Excluding server IP $resolvedIp from tunnel")
+                        val dynamicRoutes = com.github.kr328.clash.service.util.RoutingUtils.calculateDynamicRoutes(resolvedIp)
+                        dynamicRoutes.forEach { route ->
+                            try {
+                                addRoute(route.first, route.second)
+                            } catch (e: Exception) {}
+                        }
+                    } catch (e: Exception) {
+                        Log.e("TunService: DNS resolution failed for $serverHost, falling back to NET_ANY", e)
+                        addRoute(NET_ANY, 0)
+                    }
+                } else {
+                    addRoute(NET_ANY, 0)
+                }
+
                 if (store.allowIpv6) {
                     addRoute(NET_ANY6, 0)
                 }
