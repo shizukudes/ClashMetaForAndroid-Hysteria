@@ -91,6 +91,8 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
                     put("udp", true)
                 })
                 put("insecure", true)
+                put("up", config.up)
+                put("down", config.down)
                 put("recvwindowconn", config.recvWindowConn)
                 put("recvwindow", config.recvWindow)
             }
@@ -120,6 +122,8 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
                     put("udp", true)
                 })
                 put("insecure", true)
+                put("up", config.up)
+                put("down", config.down)
                 put("recvwindowconn", config.recvWindowConn)
                 put("recvwindow", config.recvWindow)
             }

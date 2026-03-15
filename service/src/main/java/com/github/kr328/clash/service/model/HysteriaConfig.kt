@@ -20,6 +20,8 @@ data class HysteriaConfig(
     var recvWindowConn: Int = 131072,
     var recvWindow: Int = 327680,
     var logLevel: String = "info",
+    var up: String = "100 Mbps",
+    var down: String = "100 Mbps",
     var yamlTemplate: String = "",
     var accounts: List<HysteriaAccount> = emptyList(),
     var activeAccountId: String? = null,
