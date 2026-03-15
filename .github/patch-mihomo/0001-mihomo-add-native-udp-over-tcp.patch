@@ -1,5 +1,5 @@
 diff --git a/adapter/outbound/socks5.go b/adapter/outbound/socks5.go
-index f27f6de8..8da51646 100644
+index f27f6de8..ad70feb8 100644
 --- a/adapter/outbound/socks5.go
 +++ b/adapter/outbound/socks5.go
 @@ -2,12 +2,14 @@ package outbound
@@ -83,7 +83,7 @@ index f27f6de8..8da51646 100644
 +
 +		// Jika gagal parse, gunakan metadata aslinya (walaupun untuk BadVPN ini salah sasaran)
 +		if udpGwTarget == nil {
-+			udpGwTarget = socks5.ParseAddrToSocksAddr(metadata.RemoteAddress())
++			udpGwTarget = serializesSocksAddr(metadata)
 +		}
 +
 +		// LAKUKAN SOCKS5 CONNECT HANDSHAKE KE ALAMAT 7300 MELEWATI LIBLOAD
