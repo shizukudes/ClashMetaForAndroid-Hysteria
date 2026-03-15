@@ -30,6 +30,12 @@ dependencies {
     implementation(libs.androidx.activity.ktx)
 }
 
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    kotlinOptions {
+        freeCompilerArgs = freeCompilerArgs + listOf("-nowarn", "-Xsuppress-version-warnings")
+    }
+}
+
 tasks.getByName("clean", type = Delete::class) {
     delete(file("release"))
 }

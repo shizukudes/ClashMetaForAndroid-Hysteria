@@ -70,6 +70,7 @@ abstract class BaseActivity<D : Design<*>> : AppCompatActivity(),
         }
     }
 
+    @Deprecated("Deprecated in Java")
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
         if (designStack.isNotEmpty()) {
