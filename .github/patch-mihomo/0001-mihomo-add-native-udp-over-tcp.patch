@@ -1,21 +1,8 @@
-commit 97709b378f2ca36fd16b622d2c555d818d227d4b
-Author: Termux Builder <bot@termux.local>
-Date:   Sun Mar 15 20:37:27 2026 +0700
-
-    feat: implement native UDP-over-TCP (UDP-GW/BadVPN) in SOCKS5 outbound adapter
-
 diff --git a/adapter/outbound/socks5.go b/adapter/outbound/socks5.go
-index f27f6de8..b6ade16f 100644
+index f27f6de8..7f07a39b 100644
 --- a/adapter/outbound/socks5.go
 +++ b/adapter/outbound/socks5.go
-@@ -2,12 +2,14 @@ package outbound
- 
- import (
- 	"context"
-+	"encoding/binary"
- 	"errors"
- 	"fmt"
- 	"io"
+@@ -8,6 +8,7 @@ import (
  	"net"
  	"net/netip"
  	"strconv"
@@ -23,7 +10,7 @@ index f27f6de8..b6ade16f 100644
  
  	N "github.com/metacubex/mihomo/common/net"
  	"github.com/metacubex/mihomo/component/ca"
-@@ -25,6 +27,7 @@ type Socks5 struct {
+@@ -25,6 +26,7 @@ type Socks5 struct {
  	tls            bool
  	skipCertVerify bool
  	tlsConfig      *tls.Config
@@ -31,7 +18,7 @@ index f27f6de8..b6ade16f 100644
  }
  
  type Socks5Option struct {
-@@ -36,6 +39,7 @@ type Socks5Option struct {
+@@ -36,6 +38,7 @@ type Socks5Option struct {
  	Password       string `proxy:"password,omitempty"`
  	TLS            bool   `proxy:"tls,omitempty"`
  	UDP            bool   `proxy:"udp,omitempty"`
@@ -39,7 +26,7 @@ index f27f6de8..b6ade16f 100644
  	SkipCertVerify bool   `proxy:"skip-cert-verify,omitempty"`
  	Fingerprint    string `proxy:"fingerprint,omitempty"`
  	Certificate    string `proxy:"certificate,omitempty"`
-@@ -90,6 +94,47 @@ func (ss *Socks5) ListenPacketContext(ctx context.Context, metadata *C.Metadata)
+@@ -90,6 +93,41 @@ func (ss *Socks5) ListenPacketContext(ctx context.Context, metadata *C.Metadata)
  	if err = ss.ResolveUDP(ctx, metadata); err != nil {
  		return nil, err
  	}
@@ -70,12 +57,6 @@ index f27f6de8..b6ade16f 100644
 +			}
 +		}
 +
-+		// BadVPN UDP-GW logic: Connect to proxy and then send UDP packets over this TCP stream
-+		// We use CmdConnect to the proxy itself, or just use the raw connection if the proxy handles it at root
-+		// However, most UDP-GW implementations on SOCKS5 expect a standard CONNECT to the target or a specific port.
-+		// For Hysteria mod at port 7300, we simply use the established connection.
-+		
-+		// If authentication is needed, perform SOCKS5 handshake first
 +		if _, err := ss.clientHandshakeContext(ctx, c, serializesSocksAddr(metadata), socks5.CmdConnect, user); err != nil {
 +			c.Close()
 +			return nil, err
@@ -87,7 +68,7 @@ index f27f6de8..b6ade16f 100644
  	c, err := ss.dialer.DialContext(ctx, "tcp", ss.addr)
  	if err != nil {
  		err = fmt.Errorf("%s connect error: %w", ss.addr, err)
-@@ -205,6 +250,7 @@ func NewSocks5(option Socks5Option) (*Socks5, error) {
+@@ -205,6 +243,7 @@ func NewSocks5(option Socks5Option) (*Socks5, error) {
  		tls:            option.TLS,
  		skipCertVerify: option.SkipCertVerify,
  		tlsConfig:      tlsConfig,
@@ -95,7 +76,7 @@ index f27f6de8..b6ade16f 100644
  	}
  	outbound.dialer = option.NewDialer(outbound.DialOptions())
  	return outbound, nil
-@@ -248,3 +294,64 @@ func (uc *socksPacketConn) Close() error {
+@@ -248,3 +287,64 @@ func (uc *socksPacketConn) Close() error {
  	uc.tcpConn.Close()
  	return uc.PacketConn.Close()
  }

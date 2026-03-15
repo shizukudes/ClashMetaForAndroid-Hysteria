@@ -57,6 +57,11 @@ jobs:
           cd $(go env GOROOT)
           for p in $GITHUB_WORKSPACE/.github/patch/*.patch; do patch --verbose -p 1 < "$p"; done
 
+      - name: Apply Mihomo Patches
+        run: |
+          cd core/src/foss/golang/clash
+          for p in $GITHUB_WORKSPACE/.github/patch-mihomo/*.patch; do patch --verbose -p 1 < "$p"; done
+
       - uses: actions/cache@v4
         with:
           path: |
