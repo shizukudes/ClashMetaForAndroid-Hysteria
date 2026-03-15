@@ -194,7 +194,7 @@ subprojects {
 }
 
 task("clean", type = Delete::class) {
-    delete(rootProject.buildDir)
+    delete(rootProject.layout.buildDirectory)
 }
 
 tasks.wrapper {

@@ -25,17 +25,18 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor")
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    kotlinOptions {
-        freeCompilerArgs = freeCompilerArgs + listOf("-nowarn", "-Xsuppress-version-warnings")
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions {
+        freeCompilerArgs.addAll("-nowarn", "-Xsuppress-version-warnings")
     }
 }
 
 afterEvaluate {
     android {
         libraryVariants.forEach {
-            sourceSets[it.name].kotlin.srcDir(buildDir.resolve("generated/ksp/${it.name}/kotlin"))
-            sourceSets[it.name].java.srcDir(buildDir.resolve("generated/ksp/${it.name}/java"))
+            val variantName = it.name
+            sourceSets[variantName].kotlin.srcDir(layout.buildDirectory.dir("generated/ksp/$variantName/kotlin"))
+            sourceSets[variantName].java.srcDir(layout.buildDirectory.dir("generated/ksp/$variantName/java"))
         }
     }
 }

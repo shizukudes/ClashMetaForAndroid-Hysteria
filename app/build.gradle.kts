@@ -30,9 +30,9 @@ dependencies {
     implementation(libs.androidx.activity.ktx)
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    kotlinOptions {
-        freeCompilerArgs = freeCompilerArgs + listOf("-nowarn", "-Xsuppress-version-warnings")
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions {
+        freeCompilerArgs.addAll("-nowarn", "-Xsuppress-version-warnings")
     }
 }
 
