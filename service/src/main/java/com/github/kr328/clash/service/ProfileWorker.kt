@@ -1,5 +1,6 @@
 package com.github.kr328.clash.service
 
+import android.app.Service
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Binder

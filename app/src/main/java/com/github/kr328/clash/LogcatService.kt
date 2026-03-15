@@ -60,7 +60,7 @@ class LogcatService : Service(), CoroutineScope by CoroutineScope(Dispatchers.De
 
         unbindService(connection)
 
-        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopForeground(Service.STOP_FOREGROUND_REMOVE)
 
         running = false
 
