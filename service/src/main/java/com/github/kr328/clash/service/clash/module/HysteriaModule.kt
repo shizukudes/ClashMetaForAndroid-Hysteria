@@ -77,6 +77,33 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
             else -> "info"
         }
 
+        if (enabledAccounts.size == 1) {
+            val account = enabledAccounts[0]
+            val port = config.localPort
+
+            val hyConfig = JSONObject().apply {
+                put("server", "${account.serverIp}:${account.serverPortRange}")
+                put("obfs", account.obfs)
+                put("auth", account.password)
+                put("loglevel", hyLogLevel)
+                put("socks5", JSONObject().put("listen", "127.0.0.1:$port"))
+                put("insecure", true)
+                put("recvwindowconn", config.recvWindowConn)
+                put("recvwindow", config.recvWindow)
+            }
+
+            val hyCmd = arrayListOf(libUz, "-s", account.obfs, "--config", hyConfig.toString())
+            val hyPb = ProcessBuilder(hyCmd)
+            hyPb.directory(filesDir)
+            hyPb.environment()["LD_LIBRARY_PATH"] = libDir
+            hyPb.redirectErrorStream(true)
+
+            Log.i("HysteriaModule: Starting Hysteria directly on port $port (UDP Optimized)")
+            val process = hyPb.start()
+            processes.add(process)
+            return
+        }
+
         enabledAccounts.forEachIndexed { index, account ->
             val port = 20080 + index
 
