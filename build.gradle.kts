@@ -2,6 +2,7 @@
 
 import com.android.build.gradle.AppExtension
 import com.android.build.gradle.BaseExtension
+import java.net.URI
 import java.net.URL
 import java.util.*
 
@@ -201,7 +202,7 @@ tasks.wrapper {
     distributionType = Wrapper.DistributionType.ALL
 
     doLast {
-        val sha256 = java.net.URI(distributionUrl).toURL().openStream()
+        val sha256 = URI(distributionUrl).toURL().openStream()
             .use { it.reader().readText().trim() }
 
         file("gradle/wrapper/gradle-wrapper.properties")
