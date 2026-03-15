@@ -70,6 +70,7 @@ abstract class BaseActivity<D : Design<*>> : AppCompatActivity(),
         }
     }
 
+    @Suppress("DEPRECATION")
     override fun onBackPressed() {
         if (designStack.isNotEmpty()) {
             popDesign()

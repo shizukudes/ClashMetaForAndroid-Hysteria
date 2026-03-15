@@ -47,7 +47,7 @@ class ProfileWorker : BaseService() {
     }
 
     override fun onDestroy() {
-        stopForeground(true)
+        stopForeground(Service.STOP_FOREGROUND_REMOVE)
 
         super.onDestroy()
     }

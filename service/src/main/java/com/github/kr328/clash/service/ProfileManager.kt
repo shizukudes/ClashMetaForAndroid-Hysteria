@@ -188,14 +188,10 @@ class ProfileManager(private val context: Context) : IProfileManager,
                     download,
                     total,
                     expire,
-                    old?.createdAt ?: System.currentTimeMillis()
+                    old.createdAt
                 )
 
-                if (old != null) {
-                    ImportedDao().update(new)
-                } else {
-                    ImportedDao().insert(new)
-                }
+                ImportedDao().update(new)
 
                 PendingDao().remove(new.uuid)
                 context.sendProfileChanged(new.uuid)
