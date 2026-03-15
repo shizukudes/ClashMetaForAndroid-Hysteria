@@ -53,7 +53,7 @@ task("downloadGeoFiles") {
 
     doLast {
         geoFilesUrls.forEach { (downloadUrl, outputFileName) ->
-            val url = URL(downloadUrl)
+            val url = java.net.URI(downloadUrl).toURL()
             val outputPath = file("$geoFilesDownloadDir/$outputFileName")
             outputPath.parentFile.mkdirs()
             url.openStream().use { input ->

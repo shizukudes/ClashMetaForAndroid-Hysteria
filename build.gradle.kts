@@ -169,7 +169,7 @@ subprojects {
 
         buildFeatures.apply {
             dataBinding {
-                isEnabled = name != "hideapi"
+                enable = name != "hideapi"
             }
         }
 
@@ -201,7 +201,7 @@ tasks.wrapper {
     distributionType = Wrapper.DistributionType.ALL
 
     doLast {
-        val sha256 = URL("$distributionUrl.sha256").openStream()
+        val sha256 = java.net.URI(distributionUrl).toURL().openStream()
             .use { it.reader().readText().trim() }
 
         file("gradle/wrapper/gradle-wrapper.properties")
