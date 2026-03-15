@@ -22,6 +22,8 @@ data class HysteriaConfig(
     var logLevel: String = "info",
     var up: String = "100 Mbps",
     var down: String = "100 Mbps",
+    var hop: Int = 1,
+    var mtu: Int = 1200,
     var yamlTemplate: String = "",
     var accounts: List<HysteriaAccount> = emptyList(),
     var activeAccountId: String? = null,
