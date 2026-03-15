@@ -167,17 +167,19 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
                 }
 
                 if (serverHost.isNotEmpty()) {
-                    try {
-                        val resolvedIp = java.net.InetAddress.getByName(serverHost).hostAddress ?: serverHost
-                        Log.i("TunService: Excluding server IP $resolvedIp from tunnel")
-                        val dynamicRoutes = com.github.kr328.clash.service.util.RoutingUtils.calculateDynamicRoutes(resolvedIp)
-                        dynamicRoutes.forEach { route ->
-                            try {
-                                addRoute(route.first, route.second)
-                            } catch (e: Exception) {}
+                    val resolvedIps = com.github.kr328.clash.service.util.RoutingUtils.resolveAllIpv4(serverHost)
+                    if (resolvedIps.isNotEmpty()) {
+                        resolvedIps.forEach { ip ->
+                            Log.i("TunService: Excluding server IP $ip from tunnel")
+                            val dynamicRoutes = com.github.kr328.clash.service.util.RoutingUtils.calculateDynamicRoutes(ip)
+                            dynamicRoutes.forEach { route ->
+                                try {
+                                    addRoute(route.first, route.second)
+                                } catch (e: Exception) {}
+                            }
                         }
-                    } catch (e: Exception) {
-                        Log.e("TunService: DNS resolution failed for $serverHost, falling back to NET_ANY", e)
+                    } else {
+                        Log.w("TunService: Could not resolve $serverHost, using default route")
                         addRoute(NET_ANY, 0)
                     }
                 } else {
