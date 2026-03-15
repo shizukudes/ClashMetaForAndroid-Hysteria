@@ -86,7 +86,10 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
                 put("obfs", account.obfs)
                 put("auth", account.password)
                 put("loglevel", hyLogLevel)
-                put("socks5", JSONObject().put("listen", "127.0.0.1:$port"))
+                put("socks5", JSONObject().apply {
+                    put("listen", "127.0.0.1:$port")
+                    put("udp", true)
+                })
                 put("insecure", true)
                 put("recvwindowconn", config.recvWindowConn)
                 put("recvwindow", config.recvWindow)
@@ -112,7 +115,10 @@ class HysteriaModule(service: Service) : Module<Unit>(service) {
                 put("obfs", account.obfs)
                 put("auth", account.password)
                 put("loglevel", hyLogLevel)
-                put("socks5", JSONObject().put("listen", "127.0.0.1:$port"))
+                put("socks5", JSONObject().apply {
+                    put("listen", "127.0.0.1:$port")
+                    put("udp", true)
+                })
                 put("insecure", true)
                 put("recvwindowconn", config.recvWindowConn)
                 put("recvwindow", config.recvWindow)
